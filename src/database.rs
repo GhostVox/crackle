@@ -1,4 +1,4 @@
-use crate::word_parser::Word;
+use super::word_parser::Word;
 use rusqlite::{Connection, Result, params};
 
 pub struct DB {
@@ -8,7 +8,7 @@ pub struct DB {
 impl DB {
     pub fn new() -> Result<Self, rusqlite::Error> {
         Ok(Self {
-            conn: Connection::open("database.db")?,
+            conn: Connection::open("crackle.db")?,
         })
     }
 }
