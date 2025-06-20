@@ -3,10 +3,10 @@ use thiserror::Error;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Character {
-    character: u8,
-    position: u8,
-    probability: Option<u32>,
-    frequency: u32,
+    pub character: u8,
+    pub position: u8,
+    pub probability: Option<u32>,
+    pub frequency: u32,
 }
 
 /// Struct representing a character in a word, with methods for creating new instances, incrementing frequency, getting character, updating probability.
@@ -52,7 +52,7 @@ pub enum WordError {
 }
 
 impl Word {
-    fn new(frequency: u32, total_probability: f64, word: &str) -> Result<Self, WordError> {
+    pub fn new(frequency: u32, total_probability: f64, word: &str) -> Result<Self, WordError> {
         let chars: Vec<Character> = word
             .chars()
             .enumerate()
@@ -113,17 +113,17 @@ impl std::fmt::Display for Word {
     }
 }
 
-/// WordParser is a state machine for parsing words from a file, It contains a stack parsed of words structs.
-pub struct WordParser {
+/// WordAnalyzer is a state machine for parsing words from a file, It contains a stack parsed of words structs.
+pub struct WordAnalyzer {
     total_words: u32,
     word_stack: Vec<Word>,
     // we will use the character and the position for the key
-    character_hash_map: HashMap<String, Character>, // HashMap to store character frequencies
+    pub character_hash_map: HashMap<String, Character>, // HashMap to store character frequencies
 }
 
-impl WordParser {
+impl WordAnalyzer {
     pub fn new() -> Self {
-        WordParser {
+        WordAnalyzer {
             total_words: 0,
             word_stack: Vec::new(),
             character_hash_map: HashMap::new(),
@@ -136,7 +136,7 @@ impl WordParser {
     }
 
     /// Parses a single word and updates the parsers internal character frequencies map
-    pub fn parse_word(&mut self, word: &str) -> Result<(), WordError> {
+    pub fn analyze_word(&mut self, word: &str) -> Result<(), WordError> {
         //Handle word validation
         if word.len() != 5 {
             return Err(WordError::InvalidWordLength(word.len()));
@@ -156,6 +156,10 @@ impl WordParser {
         }
         self.push(Word::new(0, 0.00, word)?);
         Ok(())
+    }
+
+    pub fn get_total_words(&self) -> u32 {
+        self.total_words
     }
 
     // this will give a completed hashmap of characters with their respective probabilities based on the list of words.
@@ -275,7 +279,7 @@ mod tests {
 
     #[test]
     fn test_parser_creation() {
-        let parser = WordParser::new();
+        let parser = WordAnalyzer::new();
         assert_eq!(parser.total_words, 0);
         assert_eq!(parser.word_stack.len(), 0);
         assert_eq!(parser.character_hash_map.len(), 0);
@@ -283,8 +287,8 @@ mod tests {
 
     #[test]
     fn test_parser_single_word() {
-        let mut parser = WordParser::new();
-        assert!(parser.parse_word("hello").is_ok());
+        let mut parser = WordAnalyzer::new();
+        assert!(parser.analyze_word("hello").is_ok());
 
         assert_eq!(parser.total_words, 1);
         assert_eq!(parser.word_stack.len(), 1);
@@ -300,10 +304,10 @@ mod tests {
 
     #[test]
     fn test_parser_multiple_words() {
-        let mut parser = WordParser::new();
-        parser.parse_word("hello").unwrap();
-        parser.parse_word("world").unwrap();
-        parser.parse_word("helps").unwrap();
+        let mut parser = WordAnalyzer::new();
+        parser.analyze_word("hello").unwrap();
+        parser.analyze_word("world").unwrap();
+        parser.analyze_word("helps").unwrap();
 
         assert_eq!(parser.total_words, 3);
         assert_eq!(parser.word_stack.len(), 3);
@@ -327,8 +331,8 @@ mod tests {
 
     #[test]
     fn test_parser_repeated_letters_same_word() {
-        let mut parser = WordParser::new();
-        parser.parse_word("llama").unwrap();
+        let mut parser = WordAnalyzer::new();
+        parser.analyze_word("llama").unwrap();
 
         // 'l' appears twice but in different positions
         let l0_char = parser.character_hash_map.get("l0").unwrap();
@@ -347,10 +351,10 @@ mod tests {
 
     #[test]
     fn test_finalize_probabilities() {
-        let mut parser = WordParser::new();
-        parser.parse_word("arose").unwrap(); // a0, r1, o2, s3, e4
-        parser.parse_word("alert").unwrap(); // a0, l1, e2, r3, t4
-        parser.parse_word("above").unwrap(); // a0, b1, o2, v3, e4
+        let mut parser = WordAnalyzer::new();
+        parser.analyze_word("arose").unwrap(); // a0, r1, o2, s3, e4
+        parser.analyze_word("alert").unwrap(); // a0, l1, e2, r3, t4
+        parser.analyze_word("above").unwrap(); // a0, b1, o2, v3, e4
 
         parser.finalize_probabilities();
 
@@ -369,9 +373,9 @@ mod tests {
 
     #[test]
     fn test_pop_n_parse_with_probabilities() {
-        let mut parser = WordParser::new();
-        parser.parse_word("arose").unwrap();
-        parser.parse_word("slate").unwrap();
+        let mut parser = WordAnalyzer::new();
+        parser.analyze_word("arose").unwrap();
+        parser.analyze_word("slate").unwrap();
 
         parser.finalize_probabilities();
 
@@ -390,7 +394,7 @@ mod tests {
 
     #[test]
     fn test_pop_n_parse_empty_stack() {
-        let mut parser = WordParser::new();
+        let mut parser = WordAnalyzer::new();
         parser.finalize_probabilities();
 
         assert!(parser.pop_n_parse().is_none());
@@ -398,10 +402,10 @@ mod tests {
 
     #[test]
     fn test_parser_case_sensitivity() {
-        let mut parser = WordParser::new();
+        let mut parser = WordAnalyzer::new();
 
         // Should handle uppercase input
-        parser.parse_word("HELLO").unwrap();
+        parser.analyze_word("HELLO").unwrap();
 
         let word = &parser.word_stack[0];
         assert_eq!(word.as_str(), "HELLO");
@@ -413,13 +417,13 @@ mod tests {
 
     #[test]
     fn test_comprehensive_probability_calculation() {
-        let mut parser = WordParser::new();
+        let mut parser = WordAnalyzer::new();
 
         // Add words with known patterns
-        parser.parse_word("tests").unwrap(); // t0, e1, s2, t3, s4
-        parser.parse_word("toast").unwrap(); // t0, o1, a2, s3, t4
-        parser.parse_word("trait").unwrap(); // t0, r1, a2, i3, t4
-        parser.parse_word("twist").unwrap(); // t0, w1, i2, s3, t4
+        parser.analyze_word("tests").unwrap(); // t0, e1, s2, t3, s4
+        parser.analyze_word("toast").unwrap(); // t0, o1, a2, s3, t4
+        parser.analyze_word("trait").unwrap(); // t0, r1, a2, i3, t4
+        parser.analyze_word("twist").unwrap(); // t0, w1, i2, s3, t4
 
         parser.finalize_probabilities();
 
@@ -444,11 +448,11 @@ mod tests {
 
     #[test]
     fn test_word_probability_calculation_integration() {
-        let mut parser = WordParser::new();
+        let mut parser = WordAnalyzer::new();
 
         // Create a scenario where we can predict the probability
-        parser.parse_word("aaaaa").unwrap(); // All 'a's
-        parser.parse_word("bbbbb").unwrap(); // All 'b's
+        parser.analyze_word("aaaaa").unwrap(); // All 'a's
+        parser.analyze_word("bbbbb").unwrap(); // All 'b's
 
         parser.finalize_probabilities();
 
@@ -461,12 +465,12 @@ mod tests {
 
     #[test]
     fn test_parser_error_handling() {
-        let mut parser = WordParser::new();
+        let mut parser = WordAnalyzer::new();
 
         // Add some valid words first to test state preservation
-        parser.parse_word("hello").unwrap();
-        parser.parse_word("world").unwrap();
-        parser.parse_word("tests").unwrap();
+        parser.analyze_word("hello").unwrap();
+        parser.analyze_word("world").unwrap();
+        parser.analyze_word("tests").unwrap();
 
         let initial_word_count = parser.total_words;
         let initial_stack_len = parser.word_stack.len();
@@ -474,18 +478,18 @@ mod tests {
 
         // Test invalid word lengths
         assert!(matches!(
-            parser.parse_word("hi"),
+            parser.analyze_word("hi"),
             Err(WordError::InvalidWordLength(2))
         ));
 
         assert!(matches!(
-            parser.parse_word("toolong"),
+            parser.analyze_word("toolong"),
             Err(WordError::InvalidWordLength(7))
         ));
 
         // Test invalid characters
         assert!(matches!(
-            parser.parse_word("he11o"),
+            parser.analyze_word("he11o"),
             Err(WordError::InvalidWordCharacter('1'))
         ));
 

@@ -1,5 +1,5 @@
-use super::word_parser::Word;
-use rusqlite::{Connection, Result, params};
+use super::word_analyzer::{Character, Word};
+use rusqlite::{Connection, Result, params, types::FromSql};
 
 pub struct DB {
     conn: Connection,
@@ -18,9 +18,8 @@ impl DB {
         self.conn.execute(
             "CREATE TABLE  IF NOT EXISTS words (
                 id INTEGER PRIMARY KEY autoincrement,
-                frequency INTEGER,
                 total_probability REAL,
-                Word VARCHAR(5)
+                word VARCHAR(5)
             )",
             [],
         )?;
@@ -28,21 +27,10 @@ impl DB {
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS game_results(
         id INTEGER PRIMARY KEY autoincrement,
-        word_id INTEGER FOREIGN KEY REFERENCES Words(id),
+        word_id INTEGER REFERENCES Words(id),
         date DATE DEFAULT CURRENT_DATE,
         win BOOLEAN NOT NULL,
         number_of_guesses INTEGER NOT NULL CHECK(number_of_guesses >= 1 AND number_of_guesses <= 6)
-    )",
-            [],
-        )?;
-
-        self.conn.execute(
-            "CREATE TABLE IF NOT EXISTS Characters(
-        id SMALLINT PRIMARY KEY autoincrement,
-        character VARCHAR(1),
-        position SMALLINT check(position >= 0 AND position <= 4),
-        probability REAL,
-        frequency INTEGER
     )",
             [],
         )?;
@@ -59,10 +47,44 @@ impl DB {
     }
     pub fn add_word(&self, word: Word) -> Result<(), rusqlite::Error> {
         let word_str = word.as_str();
-        let mut stmt = self.conn.prepare(
-            "INSERT INTO words (word, frequency, total_probability) VALUES (?1, ?2, ?3)",
-        )?;
-        stmt.execute(params![word_str, word.frequency, word.total_probability])?;
+        let mut stmt = self
+            .conn
+            .prepare("INSERT INTO words (word, total_probability) VALUES (?1, ?2)")?;
+        stmt.execute(params![word_str, word.total_probability])?;
         Ok(())
+    }
+    pub fn add_character(&self, character: &Character) -> Result<(), rusqlite::Error> {
+        let mut stmt = self.conn.prepare(
+            "INSERT INTO Characters (character, position, probability, frequency) VALUES (?1, ?2, ?3, ?4)",
+        )?;
+        stmt.execute(params![
+            character.character,
+            character.position,
+            character.probability,
+            character.frequency
+        ])?;
+        Ok(())
+    }
+
+    pub fn get_top_words(&self, limit: usize) -> Result<Vec<Word>, rusqlite::Error> {
+        let mut stmt = self.conn.prepare(
+            "SELECT word, total_probability FROM words ORDER BY total_probability DESC LIMIT ?1",
+        )?;
+
+        let word_iter = stmt.query_map(params![limit], |row| {
+            let word_as_str: String = row.get(0)?;
+            let total_probability: f64 = row.get(1)?;
+            Ok((word_as_str, total_probability))
+        })?;
+
+        let mut words = Vec::new();
+        for row_result in word_iter {
+            let (word_str, prob) = row_result?;
+            if let Ok(word) = Word::new(0, prob, &word_str) {
+                words.push(word);
+            }
+            // Skip invalid words silently
+        }
+        Ok(words)
     }
 }

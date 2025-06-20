@@ -1,5 +1,5 @@
-pub mod config;
 pub mod database;
-pub mod word_parser;
-
+pub mod game_loop;
+pub mod setup;
+pub mod word_analyzer;
 pub use database::DB;
