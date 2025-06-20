@@ -138,21 +138,32 @@ impl GameLoop {
 
     // Parse user input and update game state
     pub fn parse_user_input(&mut self, input: String) {
+        // if the guess has two of the same character's in the word and the first one in no we end up pushing that character into the excluded characters vector which causes any characters in the right spot to be excluded as well
+        let mut temp: [(char, bool); 5] = [('_', false); 5];
         for (i, c) in input.chars().enumerate() {
             match c {
                 'g' => {
                     let character = self.current_word.chars().nth(i).unwrap();
+                    temp[i] = (character, false);
                     self.answer[i] = character;
                 }
                 'y' => {
                     let character = self.current_word.chars().nth(i).unwrap();
+                    temp[i] = (character, false);
                     self.yellow_positions.push((character, i));
                 }
                 'n' => {
                     let character = self.current_word.chars().nth(i).unwrap();
-                    self.excluded_characters.push(character);
+                    temp[i] = (character, true);
                 }
                 _ => unreachable!(),
+            }
+        }
+        for (character, excluded) in temp.iter() {
+            if *excluded && !temp.iter().any(|(c, e)| c == character && !*e) {
+                if !self.excluded_characters.contains(character) {
+                    self.excluded_characters.push(*character);
+                }
             }
         }
     }
