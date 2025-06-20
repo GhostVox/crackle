@@ -40,13 +40,15 @@ pub fn setup() -> Result<DB, SetupError> {
 
     word_analyzer.finalize_probabilities();
 
+    // Pop words from the analyzer and add them to the database until there are no more
     loop {
-        match word_analyzer.pop_n_parse() {
-            Some(word) => {
+        match word_analyzer.pop() {
+            Ok(Some(word)) => {
                 db.add_word(word)?;
             }
-            None => {
-                break;
+            Ok(None) => break,
+            Err(word_analyzer::WordAnalyzerError::ProbabilitiesNotFinalized) => {
+                word_analyzer.finalize_probabilities();
             }
         }
     }

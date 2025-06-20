@@ -1,7 +1,7 @@
 use crate::game_loop::GameResults;
 
 use super::word_analyzer::{Character, Word};
-use rusqlite::{Connection, Result, params, types::FromSql};
+use rusqlite::{Connection, Result, Rows, params, types::FromSql};
 
 pub struct DB {
     conn: Connection,
@@ -100,5 +100,15 @@ impl DB {
             game_results.win
         ])?;
         Ok(())
+    }
+
+    pub fn filter_words(&self, pattern: &str) -> Result<Vec<String>, rusqlite::Error> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT word FROM words WHERE word LIKE ?1 ")?;
+
+        let word_iter = stmt.query_map(params![pattern], |row| row.get(0))?;
+
+        word_iter.collect()
     }
 }

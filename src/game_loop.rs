@@ -1,4 +1,6 @@
-use crate::{database, word_analyzer::Character};
+use std::str::FromStr;
+
+use crate::{database, word_analyzer::WordAnalyzer};
 use rand::Rng;
 use rusqlite::Connection;
 
@@ -35,7 +37,7 @@ impl GameLoop {
             excluded_characters: Vec::new(),
             included_characters: Vec::new(),
             current_word: String::from("_____"),
-            answer: [' '; 5],
+            answer: ['_'; 5],
             db,
         }
     }
@@ -56,20 +58,8 @@ impl GameLoop {
             }
             Err(e) => return Err(GameError::DatabaseError(e)),
         }
-        println!("Welcome to Crackle!");
-        println!("I will give you a word to try based on positional frequency");
-        println!(
-            "All you will have to do is tell me which characters were in the right position so we can narrow down the possibilities"
-        );
-        println!(
-            "To achieve this, you will need to enter G for green, Y for yellow, and N for gray"
-        );
-
-        println!("Starting game with word: {}", self.current_word);
-
-        println!("Please enter which characters were in the right position");
-
-        println!("Example: {}", EXPECTED_FORMAT);
+        // Welcome the user
+        self.welcome_msg();
 
         loop {
             if self.number_of_guesses > 6 {
@@ -83,14 +73,22 @@ impl GameLoop {
             let user_input = self.get_user_input();
             self.parse_user_input(user_input);
             if self.check_for_win() {
+                if let Err(e) = self.store_game_results() {
+                    println!("Error storing game results: {}", e);
+                    return Err(GameError::DatabaseError(e));
+                }
                 break;
             }
+            // take users input from last guess and calculate new guess
+            let next_guess = self.get_next_guess();
+            println!("The next guess is {}", next_guess);
             self.number_of_guesses += 1;
         }
 
         return Ok(());
     }
 
+    // Get user input
     pub fn get_user_input(&mut self) -> String {
         let mut input = String::new();
         if let Err(e) = std::io::stdin().read_line(&mut input) {
@@ -119,6 +117,7 @@ impl GameLoop {
         input
     }
 
+    // Parse user input and update game state
     pub fn parse_user_input(&mut self, input: String) {
         for (i, c) in input.chars().enumerate() {
             match c {
@@ -139,6 +138,7 @@ impl GameLoop {
         }
     }
 
+    // compares answer with current_word if they match exactly we have won!
     pub fn check_for_win(&self) -> bool {
         if self.current_word.chars().collect::<Vec<_>>()
             == self.answer.iter().cloned().collect::<Vec<_>>()
@@ -150,6 +150,7 @@ impl GameLoop {
         }
     }
 
+    // Clean up function Stores game results in database
     pub fn store_game_results(&self) -> Result<(), rusqlite::Error> {
         let game_results = GameResults {
             word: self.current_word.clone(),
@@ -161,5 +162,51 @@ impl GameLoop {
         self.db.store_game_results(game_results)?;
 
         Ok(())
+    }
+
+    pub fn welcome_msg(&self) {
+        println!("Welcome to Crackle!");
+        println!("I will give you a word to try based on positional frequency");
+        println!(
+            "All you will have to do is tell me which characters were in the right position so we can narrow down the possibilities"
+        );
+        println!(
+            "To achieve this, you will need to enter G for green, Y for yellow, and N for gray"
+        );
+
+        println!("Starting game with word: {}", self.current_word);
+
+        println!("Please enter which characters were in the right position");
+
+        println!("Example: {}", EXPECTED_FORMAT);
+    }
+
+    pub fn get_next_guess(&self) -> String {
+        let pattern: String = self.answer.iter().collect::<String>();
+        let potential_words = self.db.filter_words(&pattern);
+        match potential_words {
+            Ok(words) => {
+                if words.is_empty() {
+                    println!("No matching words found!");
+                    String::new()
+                } else {
+                    let mut word_analyzer = WordAnalyzer::new();
+                    for word in words {
+                        let _result = word_analyzer.analyze_word(&word);
+                    }
+                    word_analyzer.finalize_probabilities();
+                    if let Some(mpw) = word_analyzer.get_most_probable_word() {
+                        String::from(mpw.as_str())
+                    } else {
+                        println!("No word found");
+                        std::process::exit(1);
+                    }
+                }
+            }
+            Err(err) => {
+                println!("Error filtering words: {}", err);
+                String::new()
+            }
+        }
     }
 }
