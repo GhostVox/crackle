@@ -12,5 +12,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if !db_exists {
         setup::setup()?;
     }
+
     Ok(())
 }

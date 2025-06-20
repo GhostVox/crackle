@@ -1,3 +1,5 @@
+use crate::game_loop::GameResults;
+
 use super::word_analyzer::{Character, Word};
 use rusqlite::{Connection, Result, params, types::FromSql};
 
@@ -86,5 +88,17 @@ impl DB {
             // Skip invalid words silently
         }
         Ok(words)
+    }
+
+    pub fn store_game_results(&self, game_results: GameResults) -> Result<(), rusqlite::Error> {
+        let mut stmt = self.conn.prepare(
+            "INSERT INTO game_results (word, number_of_guesses, win) VALUES (?1, ?2, ?3)",
+        )?;
+        stmt.execute(params![
+            game_results.word.as_str(),
+            game_results.number_of_guesses,
+            game_results.win
+        ])?;
+        Ok(())
     }
 }
