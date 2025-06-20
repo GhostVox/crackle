@@ -1,15 +1,14 @@
-use std::str::FromStr;
-
 use crate::{database, word_analyzer::WordAnalyzer};
 use rand::Rng;
 use rusqlite::Connection;
+use thiserror::Error;
 
 const EXPECTED_FORMAT: &str = "gyngy";
 
 pub struct GameLoop {
     pub number_of_guesses: u8,
     pub excluded_characters: Vec<char>,
-    pub included_characters: Vec<char>,
+    pub yellow_positions: Vec<(char, usize)>,
     pub current_word: String,
     pub answer: [char; 5],
     pub db: database::DB,
@@ -21,35 +20,36 @@ pub struct GameResults {
     pub win: bool,
 }
 
+#[derive(Debug, Error)]
 pub enum GameError {
+    #[error("Database error: {0}")]
     DatabaseError(rusqlite::Error),
+    #[error("Word not found error")]
     WordNotFoundError,
+    #[error("Invalid input error")]
+    InvalidInputError,
 }
-enum Answers {
-    Green,
-    Yellow,
-    Gray,
-}
+
 impl GameLoop {
     pub fn new(db: database::DB) -> Self {
         Self {
             number_of_guesses: 0,
             excluded_characters: Vec::new(),
-            included_characters: Vec::new(),
+            yellow_positions: Vec::new(),
             current_word: String::from("_____"),
-            answer: ['_'; 5],
+            answer: ['_'; 5], // this gets filled with characters that are green
             db,
         }
     }
 
-    pub fn start(&mut self, db: database::DB) -> Result<(), GameError> {
+    pub fn start(&mut self) -> Result<(), GameError> {
         // Get the limit from the environment variable or default to 10
         let limit = std::env::var("LIMIT")
             .unwrap_or_else(|_| "10".to_string())
             .parse()
             .unwrap_or(10);
         // Get the top words from the database
-        let top_words = db.get_top_words(limit);
+        let top_words = self.db.get_top_words(limit);
         match top_words {
             Ok(words) => {
                 let rng = rand::thread_rng().gen_range(0..limit);
@@ -70,7 +70,22 @@ impl GameLoop {
                 }
                 break;
             }
-            let user_input = self.get_user_input();
+            let mut valid_input = false;
+            let mut user_input = String::new();
+            loop {
+                if valid_input {
+                    break;
+                }
+                let input = self.get_user_input();
+                match input {
+                    Ok(input) => {
+                        valid_input = true;
+                        user_input = input;
+                    }
+                    Err(_) => continue,
+                }
+            }
+
             self.parse_user_input(user_input);
             if self.check_for_win() {
                 if let Err(e) = self.store_game_results() {
@@ -80,8 +95,10 @@ impl GameLoop {
                 break;
             }
             // take users input from last guess and calculate new guess
-            let next_guess = self.get_next_guess();
-            println!("The next guess is {}", next_guess);
+            let next_possible_guesses = self.get_next_guess();
+            println!("Next possible guesses: {:?}", next_possible_guesses);
+            self.current_word = next_possible_guesses;
+
             self.number_of_guesses += 1;
         }
 
@@ -89,13 +106,14 @@ impl GameLoop {
     }
 
     // Get user input
-    pub fn get_user_input(&mut self) -> String {
+    pub fn get_user_input(&mut self) -> Result<String, GameError> {
         let mut input = String::new();
         if let Err(e) = std::io::stdin().read_line(&mut input) {
             println!(
                 "Sorry I couldn't read your input error:{e}, please try again. Expected format: {}",
                 EXPECTED_FORMAT
             );
+            return Err(GameError::InvalidInputError);
         }
         let input = input.trim().to_lowercase();
         if input == "exit" {
@@ -107,14 +125,16 @@ impl GameLoop {
                 "Sorry your input was not the correct length, please try again. Expected format: {}",
                 EXPECTED_FORMAT
             );
+            return Err(GameError::InvalidInputError);
         }
         if !input.chars().all(|c| c == 'g' || c == 'y' || c == 'n') {
             println!(
                 "Sorry your input was not the correct format, please try again. Expected format: {}",
                 EXPECTED_FORMAT
             );
+            return Err(GameError::InvalidInputError);
         }
-        input
+        Ok(input)
     }
 
     // Parse user input and update game state
@@ -127,7 +147,7 @@ impl GameLoop {
                 }
                 'y' => {
                     let character = self.current_word.chars().nth(i).unwrap();
-                    self.included_characters.push(character);
+                    self.yellow_positions.push((character, i));
                 }
                 'n' => {
                     let character = self.current_word.chars().nth(i).unwrap();
@@ -140,14 +160,7 @@ impl GameLoop {
 
     // compares answer with current_word if they match exactly we have won!
     pub fn check_for_win(&self) -> bool {
-        if self.current_word.chars().collect::<Vec<_>>()
-            == self.answer.iter().cloned().collect::<Vec<_>>()
-        {
-            println!("Congratulations! You won!");
-            true
-        } else {
-            false
-        }
+        !self.answer.contains(&'_')
     }
 
     // Clean up function Stores game results in database
@@ -185,11 +198,23 @@ impl GameLoop {
         let pattern: String = self.answer.iter().collect::<String>();
         let potential_words = self.db.filter_words(&pattern);
         match potential_words {
-            Ok(words) => {
+            Ok(mut words) => {
                 if words.is_empty() {
                     println!("No matching words found!");
                     String::new()
                 } else {
+                    words.retain(|word| {
+                        !self
+                            .excluded_characters
+                            .iter()
+                            .any(|&excluded_character| word.contains(excluded_character))
+                    });
+                    // Filter for yellow letters (must contain but not in wrong position)
+                    words.retain(|word| {
+                        self.yellow_positions.iter().all(|(ch, wrong_pos)| {
+                            word.contains(*ch) && word.chars().nth(*wrong_pos) != Some(*ch)
+                        })
+                    });
                     let mut word_analyzer = WordAnalyzer::new();
                     for word in words {
                         let _result = word_analyzer.analyze_word(&word);

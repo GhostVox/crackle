@@ -1,4 +1,4 @@
-use crackle::setup;
+use crackle::{database, game_loop, setup};
 use dotenv::dotenv;
 use std::fs;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -9,8 +9,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let db_exists = fs::metadata("crackle.db").is_ok();
+    let db: database::DB;
     if !db_exists {
-        setup::setup()?;
+        db = setup::setup()?;
+    } else {
+        db = database::DB::new()?;
+    }
+
+    let mut game = game_loop::GameLoop::new(db);
+    let err = game.start();
+    if let Err(err) = err {
+        println!("Error starting game: {}", err);
     }
 
     Ok(())
