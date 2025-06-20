@@ -1,73 +1,143 @@
-# Wordle Solver Architecture & Flow
 
-## Project Overview
-Building a CLI tool to correctly guess the Wordle word of the day using probabilistic analysis and database-driven word filtering.
-
-## Architecture Components
-
-### 1. WordParser Module (`word_parser.rs`)
-**Responsibilities:**
-- Parse word lists from files
-- Calculate character frequency by position
-- Generate probability scores for words
-- Provide processed words with calculated probabilities
-
-**Key Structures:**
-```rust
-struct Character {
-    character: u8,
-    position: u8,
-    probability: Option<u32>,  // 0-100 percentage
-    frequency: u32,
-}
-
-struct Word {
-    frequency: u32,
-    total_probability: f64,    // 0-1.0 decimal
-    word: [Character; 5],
-}
-
-struct WordParser {
-    total_words: u32,
-    word_stack: Vec<Word>,
-    character_hash_map: HashMap<String, Character>, // "a0", "e1", etc.
-}
 ```
 
-**Key Methods:**
-- `parse_word(word: &str)` - Add word to analysis
-- `finalize_probabilities()` - Calculate all character probabilities
-- `pop_n_parse() -> Option<Word>` - Get word with calculated probability
+██████╗██████╗  █████╗  ██████╗██╗  ██╗██╗     ███████╗
+██╔════╝██╔══██╗██╔══██╗██╔════╝██║ ██╔╝██║     ██╔════╝
+██║     ██████╔╝███████║██║     █████╔╝ ██║     █████╗
+██║     ██╔══██╗██╔══██║██║     ██╔═██╗ ██║     ██╔══╝
+╚██████╗██║  ██║██║  ██║╚██████╗██║  ██╗███████╗███████╗
+ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚══════╝╚══════╝
 
-### 2. Database Module (`database.rs`)
-**Responsibilities:**
-- Store words with their probabilities
-- Retrieve best words based on probability
-- Filter words based on game constraints
-- Persist game results and statistics
+ ` ` `
 
-**Database Schema:**
+
+    🎯 Probabilistic Wordle Solver 🎯
+A sophisticated CLI Wordle solver that uses probabilistic analysis and database-driven word filtering to systematically crack any Wordle puzzle.
+
+## Overview
+
+Crackle analyzes character frequency by position across a comprehensive word list, calculates probability scores for optimal guessing, and uses your feedback to narrow down possibilities until it finds the answer. Built in Rust with SQLite for efficient word storage and filtering.
+
+## Features
+
+- **Probabilistic Word Analysis**: Calculates character frequency by position to suggest optimal starting words
+- **Interactive Game Loop**: Guides you through each guess with simple feedback input
+- **Database-Driven Filtering**: Uses SQLite for fast word filtering based on game constraints
+- **Game Statistics**: Tracks wins, number of guesses, and performance over time
+- **Smart Constraint Handling**: Properly handles green/yellow/gray letter feedback
+- **Comprehensive Word List**: Includes extensive vocabulary for better probability calculations
+
+## Quick Start
+
+### Prerequisites
+
+- Rust (2024 edition)
+- SQLite (bundled with rusqlite)
+
+### Installation
+
+1. Clone the repository:
+```bash
+git clone <your-repo-url>
+cd crackle
+```
+
+2. Set up environment variables:
+```bash
+# Create .env file
+echo "WORD_SOURCE=words.txt" > .env
+echo "LIMIT=10" >> .env
+```
+
+3. Build and run:
+```bash
+cargo run
+```
+
+## How to Use
+
+1. **Start the game** - Crackle will suggest a starting word based on probability analysis
+2. **Enter the word in Wordle** - Use the suggested word in your Wordle game
+3. **Provide feedback** - Tell Crackle the results using this format:
+   - `G` = Green (correct letter in correct position)
+   - `Y` = Yellow (correct letter in wrong position)
+   - `N` = Gray (letter not in word)
+
+### Example Game Session
+
+```
+Welcome to Crackle!
+Starting game with word: ARISE
+
+Please enter which characters were in the right position
+Example: gyngy
+
+> gnnyn
+Next possible guesses: ["ABOUT", "ALIEN", "ALONE"]
+Starting game with word: ABOUT
+
+> ggynn
+Next possible guesses: ["ABBEY"]
+Starting game with word: ABBEY
+
+> ggggg
+You won! 🎉
+```
+
+## Input Format
+
+For each guess, enter exactly 5 characters representing the Wordle feedback:
+
+- **G** (Green): Letter is correct and in the right position
+- **Y** (Yellow): Letter is in the word but in the wrong position
+- **N** (Gray): Letter is not in the word at all
+
+**Example**: If you guessed "ARISE" and got:
+- A is green (position 0)
+- R is gray
+- I is yellow
+- S is gray
+- E is green (position 4)
+
+Enter: `gnygn`
+
+## Project Structure
+
+```
+src/
+├── main.rs           # Entry point and initialization
+├── lib.rs            # Module exports
+├── setup.rs          # Database setup and word list processing
+├── word_analyzer.rs  # Core probability analysis engine
+├── database.rs       # SQLite operations and word filtering
+└── game_loop.rs      # Interactive game logic and user interface
+
+words.txt             # Comprehensive word list for analysis
+.env                  # Environment configuration
+```
+
+## Architecture
+
+### Core Components
+
+1. **WordAnalyzer**: Analyzes word lists and calculates character probabilities by position
+2. **Database**: Stores processed words with probabilities and handles constraint-based filtering
+3. **GameLoop**: Manages interactive gameplay, user input, and game state
+4. **Setup**: Initializes database and processes word list on first run
+
+### Database Schema
+
 ```sql
--- Words table
+-- Stores words with calculated probabilities
 CREATE TABLE words (
-    id INTEGER PRIMARY KEY autoincrement,
-    frequency INTEGER,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     total_probability REAL,
     word VARCHAR(5)
 );
 
--- Characters table
-CREATE TABLE characters (
-    id SMALLINT PRIMARY KEY autoincrement,
-    character VARCHAR(1),
-    position SMALLINT CHECK(position >= 0 AND position <= 4),
-    probability REAL,
-    frequency INTEGER
-);
-
--- Game results
+-- Tracks game performance
 CREATE TABLE game_results (
-    id INTEGER PRIMARY KEY autoincrement,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     word_id INTEGER REFERENCES words(id),
     date DATE DEFAULT CURRENT_DATE,
     win BOOLEAN NOT NULL,
@@ -75,139 +145,78 @@ CREATE TABLE game_results (
 );
 ```
 
-**Key Methods to Implement:**
-- `add_word(word: Word)` - Store processed word
-- `get_best_words(limit: usize) -> Vec<Word>` - Get highest probability words
-- `filter_words_by_constraints(game_state: &GameState) -> Vec<Word>`
-- `get_words_matching_pattern(pattern: &str) -> Vec<Word>`
-- `get_words_containing_letters(letters: &[char]) -> Vec<Word>`
-- `get_words_excluding_letters(letters: &[char]) -> Vec<Word>`
+### Algorithm Flow
 
-### 3. Game Logic Module
-**Responsibilities:**
-- Manage game state and constraints
-- Handle user input for guess results
-- Coordinate between parser and database
-- Drive the guessing loop
+1. **Initialization**: Parse word list, calculate character frequencies by position
+2. **Probability Calculation**: Score each word based on sum of character probabilities
+3. **Database Storage**: Store all words with calculated probabilities
+4. **Game Loop**:
+   - Retrieve highest probability word from remaining candidates
+   - Present to user for Wordle input
+   - Parse user feedback (G/Y/N format)
+   - Filter database based on constraints
+   - Repeat until solved
 
-**Game State:**
-```rust
-struct GameState {
-    known_positions: Vec<Option<char>>,  // [Some('a'), None, Some('e'), None, None]
-    present_letters: Vec<char>,          // Letters in word but wrong position
-    absent_letters: Vec<char>,           // Letters definitely not in word
-    guesses_made: u32,
-}
+## Configuration
 
-enum GuessResult {
-    Correct(usize),    // Green - correct letter in correct position
-    Present(usize),    // Yellow - correct letter in wrong position
-    Absent(usize),     // Gray - letter not in word
-}
-```
+Environment variables in `.env`:
 
-## Complete Workflow
+- `WORD_SOURCE`: Path to word list file (default: `words.txt`)
+- `LIMIT`: Number of top words to consider for random selection (default: `10`)
 
-### Phase 1: Setup & Initialization
-1. **Read word list file** - Load all possible Wordle words
-2. **Parse through WordParser:**
-   ```rust
-   let mut parser = WordParser::new();
-   for word in word_list {
-       parser.parse_word(word)?;
-   }
-   parser.finalize_probabilities();
-   ```
-3. **Store to database:**
-   ```rust
-   while let Some(word) = parser.pop_n_parse() {
-       db.add_word(word)?;
-   }
-   ```
+## Dependencies
 
-### Phase 2: Game Loop
-1. **Get best word from database:**
-   ```rust
-   let best_words = db.get_best_words(1);
-   let guess = &best_words[0];
-   ```
+- **rusqlite**: SQLite database operations with bundled SQLite
+- **thiserror**: Error handling and custom error types
+- **dotenv**: Environment variable management
+- **rand**: Random selection from top probability words
 
-2. **Present word to user:**
-   ```
-   Guess: AROSE
-   Enter results (G=Green, Y=Yellow, B=Black):
-   Position 0 (A): G
-   Position 1 (R): B
-   Position 2 (O): Y
-   Position 3 (S): B
-   Position 4 (E): G
-   ```
+## Game Statistics
 
-3. **Update game state:**
-   ```rust
-   game_state.update_from_guess("arose", &results);
-   ```
+Crackle automatically tracks:
+- Words used in each game
+- Number of guesses required
+- Win/loss outcomes
+- Date of each game
 
-4. **Filter remaining words:**
-   ```rust
-   let candidates = db.filter_words_by_constraints(&game_state);
-   ```
+View statistics by querying the database directly or implementing additional reporting features.
 
-5. **Repeat until solved or 6 guesses**
+## Error Handling
 
-### Phase 3: Database Filtering Logic
+Crackle includes comprehensive error handling for:
+- Invalid input formats
+- Database connection issues
+- Word list parsing problems
+- File I/O errors
 
-**SQL Query Building Examples:**
-```sql
--- Words with known positions (Green letters)
-SELECT * FROM words WHERE
-    SUBSTR(word, 1, 1) = 'A' AND    -- Position 0 = A
-    SUBSTR(word, 5, 1) = 'E'        -- Position 4 = E
+## Contributing
 
--- Words containing letters but not in specific positions (Yellow letters)
-SELECT * FROM words WHERE
-    word LIKE '%O%' AND             -- Contains O
-    SUBSTR(word, 3, 1) != 'O'       -- But not in position 2
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Submit a pull request
 
--- Words excluding letters (Black letters)
-SELECT * FROM words WHERE
-    word NOT LIKE '%R%' AND
-    word NOT LIKE '%S%'
+## License
 
--- Combined with probability ordering
-ORDER BY total_probability DESC
-LIMIT 10;
-```
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Implementation Priority
+## Performance Notes
 
-### Phase 1: Core Setup
-- [ ] Fix database filename consistency (`crackle.db` vs `database.db`)
-- [ ] Consolidate duplicate Word structs
-- [ ] Implement file reader for word lists
-- [ ] Test parser → database workflow
+- First run processes the entire word list and may take a few seconds
+- Subsequent runs are fast as the database is pre-populated
+- Word filtering uses indexed SQL queries for optimal performance
+- Memory usage is minimal as words are streamed from database
 
-### Phase 2: Database Queries
-- [ ] Implement filtering methods in database module
-- [ ] Add SQL query builders for constraints
-- [ ] Test filtering logic with sample data
+## Future Enhancements
 
-### Phase 3: Game Interface
-- [ ] Build user input parser for guess results
-- [ ] Implement game state management
-- [ ] Create main game loop
-- [ ] Add CLI interface
+- [ ] Hard mode support (must use revealed letters)
+- [ ] Multiple word list support
+- [ ] Advanced information theory scoring
+- [ ] Web interface
+- [ ] Performance analytics and suggestions
+- [ ] Custom word list upload
 
-### Phase 4: Optimization
-- [ ] Add word frequency tracking
-- [ ] Implement information theory scoring
-- [ ] Store game results for learning
-- [ ] Performance optimization
+---
 
-## Key Design Decisions
-
-1. **Separation of Concerns:** Parser handles analysis, Database handles persistence, Game logic coordinates
-2. **Probability Storage:** Characters store 0-100 percentages, Words store 0-1.0 decimals
-3. **Position-Based Analysis:** Character probabilities calculated per position (crucial for Wordle)
-4. **Database-Driven Filtering:** Use SQL for efficient word filtering based on constraints
-5. **Incremental Refinement:** Re-analyze remaining words after each guess for better suggestions
+**Happy Wordling!** 🎮
