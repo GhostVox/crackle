@@ -2,12 +2,14 @@ use crate::game_loop::GameResults;
 
 use super::word_analyzer::{Character, Word};
 use rusqlite::{Connection, Result, params};
-
+/// This is a wrapper for the database to easily interact with it.
 pub struct DB {
     conn: Connection,
 }
 
 impl DB {
+    /// Creates a new instance of the database.
+    /// This function is only called if the database does not already exist.
     pub fn new() -> Result<Self, rusqlite::Error> {
         Ok(Self {
             conn: Connection::open("crackle.db")?,
@@ -16,6 +18,8 @@ impl DB {
 }
 
 impl DB {
+    /// Sets up the database by creating the necessary tables and indexes.
+    /// This function is only called if the database does not already exist.
     pub fn setup(&self) -> Result<(), rusqlite::Error> {
         self.conn.execute(
             "CREATE TABLE  IF NOT EXISTS words (
@@ -47,6 +51,16 @@ impl DB {
         )?;
         Ok(())
     }
+
+    /// Adds a new word to the database.
+    /// expects a word struct to be passed in
+    /// ```
+    /// struct Word {
+    ///      pub frequency: u32,
+    ///      pub total_probability: f64,
+    ///      pub word: [Character; 5],
+    /// }
+    /// ```
     pub fn add_word(&self, word: Word) -> Result<(), rusqlite::Error> {
         let word_str = word.as_str();
         let mut stmt = self
@@ -55,19 +69,8 @@ impl DB {
         stmt.execute(params![word_str, word.total_probability])?;
         Ok(())
     }
-    pub fn add_character(&self, character: &Character) -> Result<(), rusqlite::Error> {
-        let mut stmt = self.conn.prepare(
-            "INSERT INTO Characters (character, position, probability, frequency) VALUES (?1, ?2, ?3, ?4)",
-        )?;
-        stmt.execute(params![
-            character.character,
-            character.position,
-            character.probability,
-            character.frequency
-        ])?;
-        Ok(())
-    }
 
+    /// Gets the words with the highest probability from the database. Requires a limit to be specified.
     pub fn get_top_words(&self, limit: usize) -> Result<Vec<Word>, rusqlite::Error> {
         let mut stmt = self.conn.prepare(
             "SELECT word, total_probability FROM words ORDER BY total_probability DESC LIMIT ?1",
@@ -90,6 +93,22 @@ impl DB {
         Ok(words)
     }
 
+    /// Stores the results of a game in the database.
+    ///
+    /// # Arguments
+    ///
+    /// * `game_results` - The results of the game to store.
+    /// ```
+    /// struct GameResults {
+    ///     word_id: retrieved with the get_word database method,
+    ///     number_of_guesses: usize,
+    ///     win: bool,
+    /// }
+    /// ```
+    /// # Returns
+    ///
+    /// * `Ok(())` - The results were successfully stored.
+    /// * `Err(rusqlite::Error)` - An error occurred while storing the results.
     pub fn store_game_results(&self, game_results: GameResults) -> Result<(), rusqlite::Error> {
         let word_id = self.get_word(&game_results.word)?;
         let mut stmt = self.conn.prepare(
@@ -103,12 +122,32 @@ impl DB {
         Ok(())
     }
 
+    /// Retrieves the ID of a word from the database.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The word to retrieve the ID for.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(usize)` - The ID of the word.
+    /// * `Err(rusqlite::Error)` - An error occurred while retrieving the word ID.
     pub fn get_word(&self, w: &str) -> Result<usize, rusqlite::Error> {
         let mut stmt = self.conn.prepare("SELECT id FROM words WHERE word = ?1")?;
         let word_id = stmt.query_row(params![w], |row| row.get(0))?;
         Ok(word_id)
     }
 
+    /// Filters words in the database based on a LIKE pattern built by the gameloop struct in game_loop.rs.
+    ///
+    /// # Arguments
+    ///
+    /// * `pattern` - The pattern to filter words by.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(Vec<String>)` - A vector of words that match the pattern.
+    /// * `Err(rusqlite::Error)` - An error occurred while filtering words.
     pub fn filter_words(&self, pattern: &str) -> Result<Vec<String>, rusqlite::Error> {
         let mut stmt = self
             .conn
