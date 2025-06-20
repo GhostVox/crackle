@@ -91,15 +91,22 @@ impl DB {
     }
 
     pub fn store_game_results(&self, game_results: GameResults) -> Result<(), rusqlite::Error> {
+        let word_id = self.get_word(&game_results.word)?;
         let mut stmt = self.conn.prepare(
-            "INSERT INTO game_results (word, number_of_guesses, win) VALUES (?1, ?2, ?3)",
+            "INSERT INTO game_results (word_id, number_of_guesses, win) VALUES (?1, ?2, ?3)",
         )?;
         stmt.execute(params![
-            game_results.word.as_str(),
+            word_id,
             game_results.number_of_guesses,
             game_results.win
         ])?;
         Ok(())
+    }
+
+    pub fn get_word(&self, w: &str) -> Result<usize, rusqlite::Error> {
+        let mut stmt = self.conn.prepare("SELECT id FROM words WHERE word = ?1")?;
+        let word_id = stmt.query_row(params![w], |row| row.get(0))?;
+        Ok(word_id)
     }
 
     pub fn filter_words(&self, pattern: &str) -> Result<Vec<String>, rusqlite::Error> {

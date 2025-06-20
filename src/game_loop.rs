@@ -54,6 +54,7 @@ impl GameLoop {
                 let rng = rand::thread_rng().gen_range(0..limit);
 
                 self.current_word = words[rng].clone().as_str();
+                self.number_of_guesses = 1;
             }
             Err(e) => return Err(GameError::DatabaseError(e)),
         }
@@ -183,7 +184,8 @@ impl GameLoop {
         // Store game_results in database or file
         //
         self.db.store_game_results(game_results)?;
-
+        println!("Game results stored successfully!");
+        println!("See you tomorrow!");
         Ok(())
     }
 
