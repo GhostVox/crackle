@@ -98,19 +98,6 @@ impl Word {
         })
     }
 
-    fn get_char_at(&self, position: usize) -> Result<char, WordError> {
-        if position < 5 {
-            Ok(self.word[position].get_char())
-        } else {
-            Err(WordError::InvalidPosition(position as u8))
-        }
-    }
-
-    fn contains_char(&self, ch: char) -> bool {
-        let byte = ch as u8;
-        self.word.iter().any(|c| c.character == byte)
-    }
-
     // Added missing method
     fn update_probability(&mut self, probability: f64) {
         self.total_probability = probability;

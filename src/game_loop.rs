@@ -1,6 +1,5 @@
 use crate::{database, word_analyzer::WordAnalyzer};
 use rand::Rng;
-use rusqlite::Connection;
 use thiserror::Error;
 
 const EXPECTED_FORMAT: &str = "gyngy";

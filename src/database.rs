@@ -1,7 +1,7 @@
 use crate::game_loop::GameResults;
 
 use super::word_analyzer::{Character, Word};
-use rusqlite::{Connection, Result, Rows, params, types::FromSql};
+use rusqlite::{Connection, Result, params};
 
 pub struct DB {
     conn: Connection,
