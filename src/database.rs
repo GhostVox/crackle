@@ -1,6 +1,6 @@
 use crate::game_loop::GameResults;
 
-use super::word_analyzer::{Character, Word};
+use super::word_analyzer::Word;
 use rusqlite::{Connection, Result, params};
 /// This is a wrapper for the database to easily interact with it.
 pub struct DB {

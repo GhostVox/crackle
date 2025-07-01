@@ -19,7 +19,7 @@ pub enum SetupError {
 /// The setup function gets the path to the initial word source file, opens the file and reads each word from the file calculates the probability and then adds it to the database.
 pub fn setup() -> Result<DB, SetupError> {
     let word_source = std::env::var("WORD_SOURCE").unwrap_or_else(|_| "words.txt".to_string());
-    if !std::fs::metadata(&word_source).is_ok() {
+    if std::fs::metadata(&word_source).is_err() {
         return Err(SetupError::WordSourceDoesNotExist);
     }
     // setup file and reader
@@ -36,7 +36,7 @@ pub fn setup() -> Result<DB, SetupError> {
         let line = line?;
         let result = word_analyzer.analyze_word(&line);
         if let Err(err) = result {
-            eprintln!("Error analyzing word: {}", err);
+            eprintln!("Error analyzing word: {err}");
         }
     }
 

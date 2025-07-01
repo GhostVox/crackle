@@ -116,7 +116,11 @@ pub struct WordAnalyzer {
     pub character_hash_map: HashMap<String, Character>,
     probabilitys_finalized: bool,
 }
-
+impl Default for WordAnalyzer {
+    fn default() -> Self {
+        WordAnalyzer::new()
+    }
+}
 impl WordAnalyzer {
     pub fn new() -> Self {
         WordAnalyzer {
@@ -148,7 +152,7 @@ impl WordAnalyzer {
 
         self.total_words += 1;
         for (i, c) in word.chars().enumerate() {
-            let key = format!("{}{}", c, i);
+            let key = format!("{c}{i}");
             let character = self
                 .character_hash_map
                 .entry(key)

@@ -1,3 +1,5 @@
+use std::io::Error;
+
 use crate::{database, word_analyzer::WordAnalyzer};
 use rand::Rng;
 use thiserror::Error;
@@ -20,13 +22,21 @@ pub struct GameResults {
 }
 
 #[derive(Debug, Error)]
+enum InputError {
+    #[error("Invalid format")]
+    InvalidFormat,
+    #[error("Invalid length")]
+    InvalidLength,
+    #[error("Error parsing input")]
+    ParaseInput(Error),
+}
+
+#[derive(Debug, Error)]
 pub enum GameError {
     #[error("Database error: {0}")]
     DatabaseError(rusqlite::Error),
     #[error("Word not found error")]
     WordNotFoundError,
-    #[error("Invalid input error")]
-    InvalidInputError,
 }
 
 impl GameLoop {
@@ -59,13 +69,21 @@ impl GameLoop {
             Err(e) => return Err(GameError::DatabaseError(e)),
         }
         // Welcome the user
-        self.welcome_msg();
+        welcome_msg(&self.current_word);
 
         loop {
+            if self.check_for_win() {
+                println!("Congratulations! You guessed the word.");
+                if let Err(e) = self.store_game_results() {
+                    println!("Error storing game results: {e}");
+                    return Err(GameError::DatabaseError(e));
+                }
+                break;
+            }
             if self.number_of_guesses > 6 {
                 println!("Damn we will get it next time.");
                 if let Err(e) = self.store_game_results() {
-                    println!("Error storing game results: {e}");
+                    println!("Error storing game results: {e}",);
                     return Err(GameError::DatabaseError(e));
                 }
                 break;
@@ -94,7 +112,7 @@ impl GameLoop {
                 }
                 break;
             }
-            // take user's input from the last guess and calculate a new guess
+            // take users input from last guess and calculate new guess
             let next_possible_guesses = self.get_next_guess();
             println!("Next possible guesses: {next_possible_guesses}");
             self.current_word = next_possible_guesses;
@@ -102,41 +120,35 @@ impl GameLoop {
             self.number_of_guesses += 1;
         }
 
-       Ok(())
+        Ok(())
     }
 
     // Get user input
-    pub fn get_user_input(&mut self) -> Result<String, GameError> {
+    fn get_user_input(&mut self) -> Result<String, InputError> {
         let mut input = String::new();
         if let Err(e) = std::io::stdin().read_line(&mut input) {
             println!(
                 "Sorry I couldn't read your input error:{e}, please try again. Expected format: {EXPECTED_FORMAT}"
             );
-            return Err(GameError::InvalidInputError);
+            return Err(InputError::ParaseInput(e));
         }
         let input = input.trim().to_lowercase();
         if input == "exit" {
             println!("Exiting game");
             std::process::exit(0);
         }
-        if input.len() != 5 {
-            println!(
-                "Sorry your input was not the correct length, please try again. Expected format: {EXPECTED_FORMAT}"
-            );
-            return Err(GameError::InvalidInputError);
+        let input_ok = check_input(&input);
+        match input_ok {
+            Ok(_) => {}
+            Err(e) => return Err(e),
         }
-        if !input.chars().all(|c| c == 'g' || c == 'y' || c == 'n') {
-            println!(
-                "Sorry your input was not the correct format, please try again. Expected format: {EXPECTED_FORMAT}"
-            );
-            return Err(GameError::InvalidInputError);
-        }
+
         Ok(input)
     }
 
     // Parse user input and update game state
     pub fn parse_user_input(&mut self, input: String) {
-        // if the guess has two of the same character's in the word and the first one is N. We end up pushing that character into the excluded characters vector which causes any characters in the right spot to be excluded as well
+        // if the guess has two of the same character's in the word and the first one in no we end up pushing that character into the excluded characters vector which causes any characters in the right spot to be excluded as well
         let mut temp: [(char, bool); 5] = [('_', false); 5];
         for (i, c) in input.chars().enumerate() {
             match c {
@@ -158,13 +170,13 @@ impl GameLoop {
             }
         }
         for (character, excluded) in temp.iter() {
-            if *excluded 
-                && !temp.iter().any(|(c, e)| c == character && !*e) 
-                && !self.excluded_characters.contains(character) {
-                    self.excluded_characters.push(*character);
-                }
+            if *excluded
+                && !temp.iter().any(|(c, e)| c == character && !*e)
+                && !self.excluded_characters.contains(character)
+            {
+                self.excluded_characters.push(*character);
             }
-        
+        }
     }
 
     // compares answer with current_word if they match exactly we have won!
@@ -172,36 +184,19 @@ impl GameLoop {
         !self.answer.contains(&'_')
     }
 
-    // Cleanup function Stores game results in the database
+    // Clean up function Stores game results in database
     pub fn store_game_results(&self) -> Result<(), rusqlite::Error> {
         let game_results = GameResults {
             word: self.current_word.clone(),
             number_of_guesses: self.number_of_guesses,
             win: self.check_for_win(),
         };
-        // Store game_results in the database or file
+        // Store game_results in database or file
         //
         self.db.store_game_results(game_results)?;
         println!("Game results stored successfully!");
         println!("See you tomorrow!");
         Ok(())
-    }
-
-    pub fn welcome_msg(&self) {
-        println!("Welcome to Crackle!");
-        println!("I will give you a word to try based on positional frequency");
-        println!(
-            "All you will have to do is tell me which characters were in the right position so we can narrow down the possibilities"
-        );
-        println!(
-            "To achieve this, you will need to enter G for green, Y for yellow, and N for gray"
-        );
-
-        println!("Starting game with word: {}", self.current_word);
-
-        println!("Please enter which characters were in the right position");
-
-        println!("Example: {EXPECTED_FORMAT}");
     }
 
     pub fn get_next_guess(&self) -> String {
@@ -219,7 +214,7 @@ impl GameLoop {
                             .iter()
                             .any(|&excluded_character| word.contains(excluded_character))
                     });
-                    // Filter for yellow letters (word contains character, but character is in the wrong position)
+                    // Filter for yellow letters (must contain but not in wrong position)
                     words.retain(|word| {
                         self.yellow_positions.iter().all(|(ch, wrong_pos)| {
                             word.contains(*ch) && word.chars().nth(*wrong_pos) != Some(*ch)
@@ -243,5 +238,57 @@ impl GameLoop {
                 String::new()
             }
         }
+    }
+}
+
+fn check_input(input: &str) -> Result<(), InputError> {
+    if input.len() != 5 {
+        println!(
+            "Sorry your input was not the correct length, please try again. Expected format: {EXPECTED_FORMAT}"
+        );
+        return Err(InputError::InvalidLength);
+    }
+    if !input.chars().all(|c| c == 'g' || c == 'y' || c == 'n') {
+        println!(
+            "Sorry your input was not the correct format, please try again. Expected format: {EXPECTED_FORMAT}"
+        );
+        return Err(InputError::InvalidFormat);
+    }
+    Ok(())
+}
+
+pub fn welcome_msg(current_word: &str) -> String {
+    let msg = format!("Welcome to Crackle!\n
+                       I will give you a word to try based on positional frequency\n
+                       All you will have to do is tell me which characters were in the right position so we can narrow down the possibilities\n
+                       To achieve this, you will need to enter G for green, Y for yellow, and N for gray\n
+                       Starting game with word: {current_word}\n
+                       Please enter which characters were in the right position\n
+                       Example: {EXPECTED_FORMAT}");
+    print!("{msg}");
+    msg
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_check_input() {
+        // Valid input: correct length and format
+        assert!(check_input("gyngy").is_ok());
+        // Invalid input: too long
+        assert!(check_input("gyngyy").is_err());
+        // Invalid input: too short
+        assert!(check_input("gyn").is_err());
+        // Invalid input: wrong characters
+        assert!(check_input("abcde").is_err());
+    }
+
+    #[test]
+    fn test_welcome_msg() {
+        let msg = welcome_msg("apple");
+        assert!(msg.contains("apple"));
+        assert!(msg.contains(EXPECTED_FORMAT))
     }
 }
