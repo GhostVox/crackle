@@ -65,7 +65,7 @@ impl GameLoop {
             if self.number_of_guesses > 6 {
                 println!("Damn we will get it next time.");
                 if let Err(e) = self.store_game_results() {
-                    println!("Error storing game results: {}", e);
+                    println!("Error storing game results: {e}");
                     return Err(GameError::DatabaseError(e));
                 }
                 break;
@@ -89,20 +89,20 @@ impl GameLoop {
             self.parse_user_input(user_input);
             if self.check_for_win() {
                 if let Err(e) = self.store_game_results() {
-                    println!("Error storing game results: {}", e);
+                    println!("Error storing game results: {e}");
                     return Err(GameError::DatabaseError(e));
                 }
                 break;
             }
-            // take users input from last guess and calculate new guess
+            // take user's input from the last guess and calculate a new guess
             let next_possible_guesses = self.get_next_guess();
-            println!("Next possible guesses: {:?}", next_possible_guesses);
+            println!("Next possible guesses: {next_possible_guesses}");
             self.current_word = next_possible_guesses;
 
             self.number_of_guesses += 1;
         }
 
-        return Ok(());
+       Ok(())
     }
 
     // Get user input
@@ -110,8 +110,7 @@ impl GameLoop {
         let mut input = String::new();
         if let Err(e) = std::io::stdin().read_line(&mut input) {
             println!(
-                "Sorry I couldn't read your input error:{e}, please try again. Expected format: {}",
-                EXPECTED_FORMAT
+                "Sorry I couldn't read your input error:{e}, please try again. Expected format: {EXPECTED_FORMAT}"
             );
             return Err(GameError::InvalidInputError);
         }
@@ -122,15 +121,13 @@ impl GameLoop {
         }
         if input.len() != 5 {
             println!(
-                "Sorry your input was not the correct length, please try again. Expected format: {}",
-                EXPECTED_FORMAT
+                "Sorry your input was not the correct length, please try again. Expected format: {EXPECTED_FORMAT}"
             );
             return Err(GameError::InvalidInputError);
         }
         if !input.chars().all(|c| c == 'g' || c == 'y' || c == 'n') {
             println!(
-                "Sorry your input was not the correct format, please try again. Expected format: {}",
-                EXPECTED_FORMAT
+                "Sorry your input was not the correct format, please try again. Expected format: {EXPECTED_FORMAT}"
             );
             return Err(GameError::InvalidInputError);
         }
@@ -139,7 +136,7 @@ impl GameLoop {
 
     // Parse user input and update game state
     pub fn parse_user_input(&mut self, input: String) {
-        // if the guess has two of the same character's in the word and the first one in no we end up pushing that character into the excluded characters vector which causes any characters in the right spot to be excluded as well
+        // if the guess has two of the same character's in the word and the first one is N. We end up pushing that character into the excluded characters vector which causes any characters in the right spot to be excluded as well
         let mut temp: [(char, bool); 5] = [('_', false); 5];
         for (i, c) in input.chars().enumerate() {
             match c {
@@ -161,12 +158,13 @@ impl GameLoop {
             }
         }
         for (character, excluded) in temp.iter() {
-            if *excluded && !temp.iter().any(|(c, e)| c == character && !*e) {
-                if !self.excluded_characters.contains(character) {
+            if *excluded 
+                && !temp.iter().any(|(c, e)| c == character && !*e) 
+                && !self.excluded_characters.contains(character) {
                     self.excluded_characters.push(*character);
                 }
             }
-        }
+        
     }
 
     // compares answer with current_word if they match exactly we have won!
@@ -174,14 +172,14 @@ impl GameLoop {
         !self.answer.contains(&'_')
     }
 
-    // Clean up function Stores game results in database
+    // Cleanup function Stores game results in the database
     pub fn store_game_results(&self) -> Result<(), rusqlite::Error> {
         let game_results = GameResults {
             word: self.current_word.clone(),
             number_of_guesses: self.number_of_guesses,
             win: self.check_for_win(),
         };
-        // Store game_results in database or file
+        // Store game_results in the database or file
         //
         self.db.store_game_results(game_results)?;
         println!("Game results stored successfully!");
@@ -203,7 +201,7 @@ impl GameLoop {
 
         println!("Please enter which characters were in the right position");
 
-        println!("Example: {}", EXPECTED_FORMAT);
+        println!("Example: {EXPECTED_FORMAT}");
     }
 
     pub fn get_next_guess(&self) -> String {
@@ -221,7 +219,7 @@ impl GameLoop {
                             .iter()
                             .any(|&excluded_character| word.contains(excluded_character))
                     });
-                    // Filter for yellow letters (must contain but not in wrong position)
+                    // Filter for yellow letters (word contains character, but character is in the wrong position)
                     words.retain(|word| {
                         self.yellow_positions.iter().all(|(ch, wrong_pos)| {
                             word.contains(*ch) && word.chars().nth(*wrong_pos) != Some(*ch)
@@ -233,7 +231,7 @@ impl GameLoop {
                     }
                     word_analyzer.finalize_probabilities();
                     if let Some(mpw) = word_analyzer.get_most_probable_word() {
-                        String::from(mpw.as_str())
+                        mpw.as_str()
                     } else {
                         println!("No word found");
                         std::process::exit(1);
@@ -241,7 +239,7 @@ impl GameLoop {
                 }
             }
             Err(err) => {
-                println!("Error filtering words: {}", err);
+                println!("Error filtering words: {err}");
                 String::new()
             }
         }

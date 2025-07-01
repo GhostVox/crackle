@@ -14,7 +14,9 @@ pub enum SetupError {
     WordSourceDoesNotExist,
 }
 
-// We need to setup the database, instatiate the WordParser, and then start parsing the words.txt in the root directory and adding the finished words to the database.
+// We need to set up the database, instantiate the WordParser, and then start parsing the words.txt in the root directory and adding the finished words to the database.
+
+/// The setup function gets the path to the initial word source file, opens the file and reads each word from the file calculates the probability and then adds it to the database.
 pub fn setup() -> Result<DB, SetupError> {
     let word_source = std::env::var("WORD_SOURCE").unwrap_or_else(|_| "words.txt".to_string());
     if !std::fs::metadata(&word_source).is_ok() {
@@ -24,7 +26,7 @@ pub fn setup() -> Result<DB, SetupError> {
     let _file = std::fs::File::open(&word_source)?;
     let reader = BufReader::new(_file);
 
-    // setup word analyzer and database
+    // set up word analyzer and database
     let mut word_analyzer = WordAnalyzer::new();
     let db = DB::new()?;
     db.setup()?;

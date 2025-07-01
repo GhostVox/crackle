@@ -55,6 +55,8 @@ impl DB {
     /// Adds a new word to the database.
     /// expects a word struct to be passed in
     /// ```
+    /// use crackle::word_analyzer::Character;
+    ///
     /// struct Word {
     ///      pub frequency: u32,
     ///      pub total_probability: f64,
@@ -100,7 +102,7 @@ impl DB {
     /// * `game_results` - The results of the game to store.
     /// ```
     /// struct GameResults {
-    ///     word_id: retrieved with the get_word database method,
+    ///     word_id: usize ,
     ///     number_of_guesses: usize,
     ///     win: bool,
     /// }
