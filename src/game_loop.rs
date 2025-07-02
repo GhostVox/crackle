@@ -81,7 +81,7 @@ impl GameLoop {
                 }
                 break;
             }
-            if self.number_of_guesses > 6 {
+            if self.number_of_guesses > 5 {
                 println!("Damn we will get it next time.");
                 if let Err(e) = self.store_game_results() {
                     println!("Error storing game results: {e}",);
@@ -204,8 +204,12 @@ impl GameLoop {
                     println!("No matching words found!");
                     String::new()
                 } else {
-                    let filtered_words =
-                        filter_words(words, &self.yellow_positions, &self.excluded_characters);
+                    let filtered_words = filter_potential_words(
+                        words,
+                        &self.yellow_positions,
+                        &self.excluded_characters,
+                        &self.current_word,
+                    );
                     let mut word_analyzer = WordAnalyzer::new();
                     for word in filtered_words {
                         let _result = word_analyzer.analyze_word(&word);
@@ -228,15 +232,17 @@ impl GameLoop {
 }
 
 /// Takes a vector of words, a hashmap of yellow positions, and a hashmap of excluded characters. It uses the hashmaps yellow positions and excluded characters to filter the words.
-fn filter_words(
+fn filter_potential_words(
     mut words: Vec<String>,
     yellow_positions: &HashMap<String, bool>,
     excluded: &HashMap<char, bool>,
+    current_word: &str,
 ) -> Vec<String> {
     words.retain(|word| {
-        word.char_indices().all(|(i, c)| {
-            !excluded.contains_key(&c) && !yellow_positions.contains_key(&format!("{c}{i}"))
-        })
+        word != current_word
+            && word.char_indices().all(|(i, c)| {
+                !excluded.contains_key(&c) && !yellow_positions.contains_key(&format!("{c}{i}"))
+            })
     });
     words
 }
@@ -260,13 +266,14 @@ fn check_input(input: &str) -> Result<(), InputError> {
 
 /// Welcome message for the game, takes the first word to start with as a parameter
 pub fn welcome_msg(current_word: &str) -> String {
-    let msg = format!("Welcome to Crackle!\n
-                       I will give you a word to try based on positional frequency\n
-                       All you will have to do is tell me which characters were in the right position so we can narrow down the possibilities\n
-                       To achieve this, you will need to enter G for green, Y for yellow, and N for gray\n
-                       Starting game with word: {current_word}\n
-                       Please enter which characters were in the right position\n
-                       Example: {EXPECTED_FORMAT}");
+    let msg = format!("
+Welcome to Crackle!\r\n
+I will give you a word to try based on positional frequency\r\n
+All you will have to do is tell me which characters were in the right position so we can narrow down the possibilities\r\n
+To achieve this, you will need to enter G for green, Y for yellow, and N for gray\r\n
+Starting game with word: {current_word}\r\n
+Please enter which characters were in the right position\r\n
+Example: {EXPECTED_FORMAT}\r\n");
     print!("{msg}");
     msg
 }
@@ -300,7 +307,7 @@ mod tests {
         let yellow_positions = HashMap::new();
         let excluded = HashMap::new();
 
-        let result = filter_words(words.clone(), &yellow_positions, &excluded);
+        let result = filter_potential_words(words.clone(), &yellow_positions, &excluded, "Manor");
         assert_eq!(result, words);
     }
 
@@ -311,7 +318,7 @@ mod tests {
         let mut excluded = HashMap::new();
         excluded.insert('l', true);
 
-        let result = filter_words(words, &yellow_positions, &excluded);
+        let result = filter_potential_words(words, &yellow_positions, &excluded, "Manor");
         assert_eq!(result, vec!["rust".to_string()]);
     }
 
@@ -326,7 +333,7 @@ mod tests {
         yellow_positions.insert("e1".to_string(), true); // 'e' at position 1
         let excluded = HashMap::new();
 
-        let result = filter_words(words, &yellow_positions, &excluded);
+        let result = filter_potential_words(words, &yellow_positions, &excluded, "Manor");
         assert_eq!(result, vec!["world".to_string()]);
     }
 
@@ -343,7 +350,7 @@ mod tests {
         let mut excluded = HashMap::new();
         excluded.insert('l', true);
 
-        let result = filter_words(words, &yellow_positions, &excluded);
+        let result = filter_potential_words(words, &yellow_positions, &excluded, "Manor");
         assert_eq!(result, vec!["great".to_string()]);
     }
 
@@ -359,7 +366,7 @@ mod tests {
         yellow_positions.insert("e4".to_string(), true); // 'e' at position 4
         let excluded = HashMap::new();
 
-        let result = filter_words(words, &yellow_positions, &excluded);
+        let result = filter_potential_words(words, &yellow_positions, &excluded, "Manor");
         assert_eq!(result, vec!["fghij".to_string()]);
     }
 
@@ -369,7 +376,7 @@ mod tests {
         let yellow_positions = HashMap::new();
         let excluded = HashMap::new();
 
-        let result = filter_words(words, &yellow_positions, &excluded);
+        let result = filter_potential_words(words, &yellow_positions, &excluded, "Manor");
         assert_eq!(result, Vec::<String>::new());
     }
 
@@ -380,7 +387,7 @@ mod tests {
         let mut excluded = HashMap::new();
         excluded.insert('o', true); // Both words contain 'o'
 
-        let result = filter_words(words, &yellow_positions, &excluded);
+        let result = filter_potential_words(words, &yellow_positions, &excluded, "Manor");
         assert_eq!(result, Vec::<String>::new());
     }
 
@@ -391,7 +398,7 @@ mod tests {
         yellow_positions.insert("e0".to_string(), true); // 'e' at position 0
         let excluded = HashMap::new();
 
-        let result = filter_words(words, &yellow_positions, &excluded);
+        let result = filter_potential_words(words, &yellow_positions, &excluded, "doger");
         // "erase" starts with 'e' at position 0, so it gets filtered out
         // "bread" has 'e' at position 2, so it passes
         assert_eq!(result, vec!["bread".to_string()]);
