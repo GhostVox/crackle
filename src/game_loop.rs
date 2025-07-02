@@ -1,4 +1,4 @@
-use std::io::Error;
+use std::{collections::HashMap, io::Error};
 
 use crate::{database, word_analyzer::WordAnalyzer};
 use rand::Rng;
@@ -8,8 +8,9 @@ const EXPECTED_FORMAT: &str = "gyngy";
 
 pub struct GameLoop {
     pub number_of_guesses: u8,
-    pub excluded_characters: Vec<char>,
-    pub yellow_positions: Vec<(char, usize)>,
+    pub excluded_characters: HashMap<char, bool>,
+    // uses a key of character + position
+    pub yellow_positions: HashMap<String, bool>,
     pub current_word: String,
     pub answer: [char; 5],
     pub db: database::DB,
@@ -28,7 +29,7 @@ enum InputError {
     #[error("Invalid length")]
     InvalidLength,
     #[error("Error parsing input")]
-    ParaseInput(Error),
+    ParseInput(Error),
 }
 
 #[derive(Debug, Error)]
@@ -43,8 +44,8 @@ impl GameLoop {
     pub fn new(db: database::DB) -> Self {
         Self {
             number_of_guesses: 0,
-            excluded_characters: Vec::new(),
-            yellow_positions: Vec::new(),
+            excluded_characters: HashMap::new(),
+            yellow_positions: HashMap::new(),
             current_word: String::from("_____"),
             answer: ['_'; 5], // this gets filled with characters that are green
             db,
@@ -80,7 +81,7 @@ impl GameLoop {
                 }
                 break;
             }
-            if self.number_of_guesses > 6 {
+            if self.number_of_guesses > 5 {
                 println!("Damn we will get it next time.");
                 if let Err(e) = self.store_game_results() {
                     println!("Error storing game results: {e}",);
@@ -130,7 +131,7 @@ impl GameLoop {
             println!(
                 "Sorry I couldn't read your input error:{e}, please try again. Expected format: {EXPECTED_FORMAT}"
             );
-            return Err(InputError::ParaseInput(e));
+            return Err(InputError::ParseInput(e));
         }
         let input = input.trim().to_lowercase();
         if input == "exit" {
@@ -148,34 +149,29 @@ impl GameLoop {
 
     // Parse user input and update game state
     pub fn parse_user_input(&mut self, input: String) {
-        // if the guess has two of the same character's in the word and the first one in no we end up pushing that character into the excluded characters vector which causes any characters in the right spot to be excluded as well
-        let mut temp: [(char, bool); 5] = [('_', false); 5];
+        // temp holds yellow characters and excluded characters
+        let mut excluded_chars: HashMap<char, bool> = HashMap::new();
         for (i, c) in input.chars().enumerate() {
             match c {
                 'g' => {
-                    let character = self.current_word.chars().nth(i).unwrap();
-                    temp[i] = (character, false);
-                    self.answer[i] = character;
+                    let c = self.current_word.chars().nth(i).unwrap();
+
+                    self.answer[i] = c;
                 }
                 'y' => {
-                    let character = self.current_word.chars().nth(i).unwrap();
-                    temp[i] = (character, false);
-                    self.yellow_positions.push((character, i));
+                    let c = self.current_word.chars().nth(i).unwrap();
+                    excluded_chars.remove(&c);
+                    self.yellow_positions.insert(format!("{c}{i}"), true);
                 }
                 'n' => {
-                    let character = self.current_word.chars().nth(i).unwrap();
-                    temp[i] = (character, true);
+                    let c = self.current_word.chars().nth(i).unwrap();
+                    excluded_chars.insert(c, true);
                 }
                 _ => unreachable!(),
             }
         }
-        for (character, excluded) in temp.iter() {
-            if *excluded
-                && !temp.iter().any(|(c, e)| c == character && !*e)
-                && !self.excluded_characters.contains(character)
-            {
-                self.excluded_characters.push(*character);
-            }
+        for (char, _) in excluded_chars.iter() {
+            self.excluded_characters.insert(*char, true);
         }
     }
 
@@ -203,25 +199,19 @@ impl GameLoop {
         let pattern: String = self.answer.iter().collect::<String>();
         let potential_words = self.db.filter_words(&pattern);
         match potential_words {
-            Ok(mut words) => {
+            Ok(words) => {
                 if words.is_empty() {
                     println!("No matching words found!");
                     String::new()
                 } else {
-                    words.retain(|word| {
-                        !self
-                            .excluded_characters
-                            .iter()
-                            .any(|&excluded_character| word.contains(excluded_character))
-                    });
-                    // Filter for yellow letters (must contain but not in wrong position)
-                    words.retain(|word| {
-                        self.yellow_positions.iter().all(|(ch, wrong_pos)| {
-                            word.contains(*ch) && word.chars().nth(*wrong_pos) != Some(*ch)
-                        })
-                    });
+                    let filtered_words = filter_potential_words(
+                        words,
+                        &self.yellow_positions,
+                        &self.excluded_characters,
+                        &self.current_word,
+                    );
                     let mut word_analyzer = WordAnalyzer::new();
-                    for word in words {
+                    for word in filtered_words {
                         let _result = word_analyzer.analyze_word(&word);
                     }
                     word_analyzer.finalize_probabilities();
@@ -241,6 +231,23 @@ impl GameLoop {
     }
 }
 
+/// Takes a vector of words, a hashmap of yellow positions, and a hashmap of excluded characters. It uses the hashmaps yellow positions and excluded characters to filter the words.
+fn filter_potential_words(
+    mut words: Vec<String>,
+    yellow_positions: &HashMap<String, bool>,
+    excluded: &HashMap<char, bool>,
+    current_word: &str,
+) -> Vec<String> {
+    words.retain(|word| {
+        word != current_word
+            && word.char_indices().all(|(i, c)| {
+                !excluded.contains_key(&c) && !yellow_positions.contains_key(&format!("{c}{i}"))
+            })
+    });
+    words
+}
+
+/// Checks the user's input for validity, ensuring it is exactly 5 characters long and contains only 'g', 'y', or 'n'.
 fn check_input(input: &str) -> Result<(), InputError> {
     if input.len() != 5 {
         println!(
@@ -257,14 +264,16 @@ fn check_input(input: &str) -> Result<(), InputError> {
     Ok(())
 }
 
+/// Welcome message for the game, takes the first word to start with as a parameter
 pub fn welcome_msg(current_word: &str) -> String {
-    let msg = format!("Welcome to Crackle!\n
-                       I will give you a word to try based on positional frequency\n
-                       All you will have to do is tell me which characters were in the right position so we can narrow down the possibilities\n
-                       To achieve this, you will need to enter G for green, Y for yellow, and N for gray\n
-                       Starting game with word: {current_word}\n
-                       Please enter which characters were in the right position\n
-                       Example: {EXPECTED_FORMAT}");
+    let msg = format!("
+Welcome to Crackle!\r\n
+I will give you a word to try based on positional frequency\r\n
+All you will have to do is tell me which characters were in the right position so we can narrow down the possibilities\r\n
+To achieve this, you will need to enter G for green, Y for yellow, and N for gray\r\n
+Starting game with word: {current_word}\r\n
+Please enter which characters were in the right position\r\n
+Example: {EXPECTED_FORMAT}\r\n");
     print!("{msg}");
     msg
 }
@@ -290,5 +299,108 @@ mod tests {
         let msg = welcome_msg("apple");
         assert!(msg.contains("apple"));
         assert!(msg.contains(EXPECTED_FORMAT))
+    }
+
+    #[test]
+    fn test_no_filtering() {
+        let words = vec!["hello".to_string(), "world".to_string(), "rust".to_string()];
+        let yellow_positions = HashMap::new();
+        let excluded = HashMap::new();
+
+        let result = filter_potential_words(words.clone(), &yellow_positions, &excluded, "Manor");
+        assert_eq!(result, words);
+    }
+
+    #[test]
+    fn test_exclude_characters() {
+        let words = vec!["hello".to_string(), "world".to_string(), "rust".to_string()];
+        let yellow_positions = HashMap::new();
+        let mut excluded = HashMap::new();
+        excluded.insert('l', true);
+
+        let result = filter_potential_words(words, &yellow_positions, &excluded, "Manor");
+        assert_eq!(result, vec!["rust".to_string()]);
+    }
+
+    #[test]
+    fn test_exclude_yellow_positions() {
+        let words = vec![
+            "hello".to_string(),
+            "helps".to_string(),
+            "world".to_string(),
+        ];
+        let mut yellow_positions = HashMap::new();
+        yellow_positions.insert("e1".to_string(), true); // 'e' at position 1
+        let excluded = HashMap::new();
+
+        let result = filter_potential_words(words, &yellow_positions, &excluded, "Manor");
+        assert_eq!(result, vec!["world".to_string()]);
+    }
+
+    #[test]
+    fn test_both_exclusions() {
+        let words = vec![
+            "hello".to_string(),
+            "helps".to_string(),
+            "world".to_string(),
+            "great".to_string(),
+        ];
+        let mut yellow_positions = HashMap::new();
+        yellow_positions.insert("e1".to_string(), true); // 'e' at position 1
+        let mut excluded = HashMap::new();
+        excluded.insert('l', true);
+
+        let result = filter_potential_words(words, &yellow_positions, &excluded, "Manor");
+        assert_eq!(result, vec!["great".to_string()]);
+    }
+
+    #[test]
+    fn test_multiple_yellow_positions() {
+        let words = vec![
+            "abcde".to_string(),
+            "aecdb".to_string(),
+            "fghij".to_string(),
+        ];
+        let mut yellow_positions = HashMap::new();
+        yellow_positions.insert("a0".to_string(), true); // 'a' at position 0
+        yellow_positions.insert("e4".to_string(), true); // 'e' at position 4
+        let excluded = HashMap::new();
+
+        let result = filter_potential_words(words, &yellow_positions, &excluded, "Manor");
+        assert_eq!(result, vec!["fghij".to_string()]);
+    }
+
+    #[test]
+    fn test_empty_input() {
+        let words = vec![];
+        let yellow_positions = HashMap::new();
+        let excluded = HashMap::new();
+
+        let result = filter_potential_words(words, &yellow_positions, &excluded, "Manor");
+        assert_eq!(result, Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_all_words_filtered() {
+        let words = vec!["hello".to_string(), "world".to_string()];
+        let yellow_positions = HashMap::new();
+        let mut excluded = HashMap::new();
+        excluded.insert('o', true); // Both words contain 'o'
+
+        let result = filter_potential_words(words, &yellow_positions, &excluded, "Manor");
+        assert_eq!(result, Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_same_character_different_positions() {
+        let words = vec!["erase".to_string(), "bread".to_string()];
+        let mut yellow_positions = HashMap::new();
+        yellow_positions.insert("e0".to_string(), true); // 'e' at position 0
+        let excluded = HashMap::new();
+
+        let result = filter_potential_words(words, &yellow_positions, &excluded, "doger");
+        // "erase" starts with 'e' at position 0, so it gets filtered out
+        // "bread" has 'e' at position 2, so it passes
+        assert_eq!(result, vec!["bread".to_string()]);
     }
 }
