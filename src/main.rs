@@ -1,4 +1,5 @@
 use crackle::{database, game_loop, setup};
+use dialoguer::{Select, theme::ColorfulTheme};
 use dotenv::dotenv;
 use std::fs;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -15,12 +16,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         setup::setup()?
     };
-
     let mut game = game_loop::GameLoop::new(db);
-    let err = game.start();
-    if let Err(err) = err {
-        println!("Error starting game: {err}");
+    loop {
+        let err = menu(&mut game);
+        if let Err(err) = err {
+            println!("Error in menu: {err}");
+            break;
+        }
     }
 
     Ok(())
+}
+
+fn menu(game: &mut game_loop::GameLoop) -> Result<(), Box<dyn std::error::Error>> {
+    let selections = &["Play", "Generate Report", "Quit"];
+    let selection = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("What would you like to do?")
+        .items(selections)
+        .interact()
+        .unwrap();
+    match selection {
+        0 => game.start()?,
+        1 => todo!(),
+        2 => return Err("exit".into()),
+        _ => unreachable!(),
+    }
+    Ok(())
+}
+
+fn handle_error(err: &Box<dyn std::error::Error>) {
+    println!("Error: {}", err);
 }
