@@ -1,4 +1,4 @@
-use std::io::Error;
+use std::{collections::HashMap, io::Error};
 
 use crate::{database, word_analyzer::WordAnalyzer};
 use rand::Rng;
@@ -8,7 +8,7 @@ const EXPECTED_FORMAT: &str = "gyngy";
 
 pub struct GameLoop {
     pub number_of_guesses: u8,
-    pub excluded_characters: Vec<char>,
+    pub excluded_characters: HashMap<char, bool>,
     pub yellow_positions: Vec<(char, usize)>,
     pub current_word: String,
     pub answer: [char; 5],
@@ -28,7 +28,7 @@ enum InputError {
     #[error("Invalid length")]
     InvalidLength,
     #[error("Error parsing input")]
-    ParaseInput(Error),
+    ParseInput(Error),
 }
 
 #[derive(Debug, Error)]
@@ -43,7 +43,7 @@ impl GameLoop {
     pub fn new(db: database::DB) -> Self {
         Self {
             number_of_guesses: 0,
-            excluded_characters: Vec::new(),
+            excluded_characters: HashMap::new(),
             yellow_positions: Vec::new(),
             current_word: String::from("_____"),
             answer: ['_'; 5], // this gets filled with characters that are green
@@ -130,7 +130,7 @@ impl GameLoop {
             println!(
                 "Sorry I couldn't read your input error:{e}, please try again. Expected format: {EXPECTED_FORMAT}"
             );
-            return Err(InputError::ParaseInput(e));
+            return Err(InputError::ParseInput(e));
         }
         let input = input.trim().to_lowercase();
         if input == "exit" {
@@ -172,9 +172,9 @@ impl GameLoop {
         for (character, excluded) in temp.iter() {
             if *excluded
                 && !temp.iter().any(|(c, e)| c == character && !*e)
-                && !self.excluded_characters.contains(character)
+                && !self.excluded_characters.contains_key(character)
             {
-                self.excluded_characters.push(*character);
+                self.excluded_characters.entry(*character).or_insert(true);
             }
         }
     }
@@ -209,10 +209,8 @@ impl GameLoop {
                     String::new()
                 } else {
                     words.retain(|word| {
-                        !self
-                            .excluded_characters
-                            .iter()
-                            .any(|&excluded_character| word.contains(excluded_character))
+                        word.chars()
+                            .all(|c| self.excluded_characters.contains_key(&c))
                     });
                     // Filter for yellow letters (must contain but not in wrong position)
                     words.retain(|word| {
