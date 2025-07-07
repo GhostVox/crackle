@@ -159,4 +159,10 @@ impl DB {
 
         word_iter.collect()
     }
+
+    pub fn reset_words(&self) -> Result<(), rusqlite::Error> {
+        let mut stmt = self.conn.prepare("DELETE FROM words")?;
+        stmt.execute(params![])?;
+        Ok(())
+    }
 }

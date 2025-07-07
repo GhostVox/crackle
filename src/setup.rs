@@ -1,3 +1,4 @@
+use crate::game_loop::GameLoop;
 use crate::word_analyzer::WordAnalyzer;
 use crate::{database::DB, word_analyzer};
 use std::io::{BufRead, BufReader};
@@ -19,29 +20,42 @@ pub enum SetupError {
 /// The setup function gets the path to the initial word source file, opens the file and reads each word from the file calculates the probability and then adds it to the database.
 pub fn setup() -> Result<DB, SetupError> {
     let word_source = std::env::var("WORD_SOURCE").unwrap_or_else(|_| "words.txt".to_string());
-    if std::fs::metadata(&word_source).is_err() {
-        return Err(SetupError::WordSourceDoesNotExist);
-    }
-    // setup file and reader
-    let _file = std::fs::File::open(&word_source)?;
-    let reader = BufReader::new(_file);
-
     // set up word analyzer and database
     let mut word_analyzer = WordAnalyzer::new();
     let db = DB::new()?;
     db.setup()?;
-
-    // walk through the file line by line and analyze each word
-    for line in reader.lines() {
-        let line = line?;
-        let result = word_analyzer.analyze_word(&line);
-        if let Err(err) = result {
-            eprintln!("Error analyzing word: {err}");
-        }
-    }
+    read_words_from_file(&word_source, &mut word_analyzer)?;
 
     word_analyzer.finalize_probabilities();
 
+    add_words_to_db(&mut word_analyzer, &db)?;
+
+    Ok(db)
+}
+
+fn read_words_from_file(
+    word_source: &str,
+    word_analyzer: &mut WordAnalyzer,
+) -> Result<(), SetupError> {
+    if std::fs::metadata(word_source).is_err() {
+        return Err(SetupError::WordSourceDoesNotExist);
+    }
+    // setup file and reader
+    let _file = std::fs::File::open(word_source)?;
+    let reader = BufReader::new(_file);
+
+    // walk through the file line by line and analyze each word
+
+    for line in reader.lines() {
+        let line = line?;
+        if let Err(err) = word_analyzer.analyze_word(&line) {
+            eprintln!("Error analyzing word: {err}");
+        }
+    }
+    Ok(())
+}
+
+fn add_words_to_db(word_analyzer: &mut WordAnalyzer, db: &DB) -> Result<(), SetupError> {
     // Pop words from the analyzer and add them to the database until there are no more
     loop {
         match word_analyzer.pop() {
@@ -54,6 +68,30 @@ pub fn setup() -> Result<DB, SetupError> {
             }
         }
     }
+    Ok(())
+}
 
-    Ok(db)
+pub fn change_word_src(game: &GameLoop) -> Result<(), SetupError> {
+    let word_source = get_new_word_source()?;
+    if std::fs::metadata(&word_source).is_err() {
+        return Err(SetupError::WordSourceDoesNotExist);
+    }
+    let mut word_analyzer = WordAnalyzer::new();
+    read_words_from_file(&word_source, &mut word_analyzer)?;
+    // Pop words from the analyzer and add them to the database until there are no more
+    word_analyzer.finalize_probabilities();
+    game.db.reset_words()?;
+    add_words_to_db(&mut word_analyzer, &game.db)?;
+    Ok(())
+}
+
+pub fn get_new_word_source() -> Result<String, SetupError> {
+    let mut word_source = String::new();
+    println!("Enter the path to the new word source file:");
+    std::io::stdin().read_line(&mut word_source)?;
+    word_source.trim().to_string();
+    if std::fs::metadata(&word_source).is_err() {
+        return Err(SetupError::WordSourceDoesNotExist);
+    }
+    Ok(word_source)
 }

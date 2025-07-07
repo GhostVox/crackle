@@ -1,4 +1,7 @@
-use crackle::{database, game_loop, setup};
+use crackle::{
+    database, game_loop,
+    setup::{self, change_word_src},
+};
 use dialoguer::{Select, theme::ColorfulTheme};
 use dotenv::dotenv;
 use std::fs;
@@ -38,12 +41,9 @@ fn menu(game: &mut game_loop::GameLoop) -> Result<(), Box<dyn std::error::Error>
     match selection {
         0 => game.start()?,
         1 => todo!(),
-        2 => return Err("exit".into()),
+        2 => change_word_src(game)?,
+        3 => return Err("exit".into()),
         _ => unreachable!(),
     }
     Ok(())
-}
-
-fn handle_error(err: &Box<dyn std::error::Error>) {
-    println!("Error: {}", err);
 }
