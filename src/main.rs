@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn menu(game: &mut game_loop::GameLoop) -> Result<(), Box<dyn std::error::Error>> {
-    let selections = &["Play", "Generate Report", "Quit"];
+    let selections = &["Play", "Generate Report", "Change Word Source", "Quit"];
     let selection = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("What would you like to do?")
         .items(selections)

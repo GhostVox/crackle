@@ -33,7 +33,7 @@ impl DB {
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS game_results(
         id INTEGER PRIMARY KEY autoincrement,
-        word_id INTEGER REFERENCES Words(id),
+        word VARCHAR(5),
         date DATE DEFAULT CURRENT_DATE,
         win BOOLEAN NOT NULL,
         number_of_guesses INTEGER NOT NULL CHECK(number_of_guesses >= 1 AND number_of_guesses <= 6)
@@ -72,6 +72,21 @@ impl DB {
         Ok(())
     }
 
+    pub fn batch_insert(&self, words: &[Word]) -> Result<(), rusqlite::Error> {
+        let tx = self.conn.unchecked_transaction()?;
+        {
+            let mut stmt =
+                tx.prepare("INSERT INTO words (word, total_probability) VALUES (?1, ?2)")?;
+
+            for word in words {
+                let word_str = word.as_str();
+                stmt.execute(params![word_str, word.total_probability])?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
     /// Gets the words with the highest probability from the database. Requires a limit to be specified.
     pub fn get_top_words(&self, limit: usize) -> Result<Vec<Word>, rusqlite::Error> {
         let mut stmt = self.conn.prepare(
@@ -102,7 +117,7 @@ impl DB {
     /// * `game_results` - The results of the game to store.
     /// ```
     /// struct GameResults {
-    ///     word_id: usize ,
+    ///     word: String,
     ///     number_of_guesses: usize,
     ///     win: bool,
     /// }
@@ -112,12 +127,11 @@ impl DB {
     /// * `Ok(())` - The results were successfully stored.
     /// * `Err(rusqlite::Error)` - An error occurred while storing the results.
     pub fn store_game_results(&self, game_results: GameResults) -> Result<(), rusqlite::Error> {
-        let word_id = self.get_word(&game_results.word)?;
         let mut stmt = self.conn.prepare(
-            "INSERT INTO game_results (word_id, number_of_guesses, win) VALUES (?1, ?2, ?3)",
+            "INSERT INTO game_results (word, number_of_guesses, win) VALUES (?1, ?2, ?3)",
         )?;
         stmt.execute(params![
-            word_id,
+            game_results.word,
             game_results.number_of_guesses,
             game_results.win
         ])?;
@@ -160,8 +174,21 @@ impl DB {
         word_iter.collect()
     }
 
-    pub fn reset_words(&self) -> Result<(), rusqlite::Error> {
-        let mut stmt = self.conn.prepare("DELETE FROM words")?;
+    pub fn delete_words(&self) -> Result<(), rusqlite::Error> {
+        let mut stmt = self.conn.prepare("DROP TABLE words;")?;
+
+        stmt.execute(params![])?;
+        Ok(())
+    }
+    pub fn create_words_table(&self) -> Result<(), rusqlite::Error> {
+        let mut stmt = self.conn.prepare(
+            "CREATE TABLE  IF NOT EXISTS words (
+                id INTEGER PRIMARY KEY autoincrement,
+                total_probability REAL,
+                word VARCHAR(5)
+            )",
+        )?;
+
         stmt.execute(params![])?;
         Ok(())
     }

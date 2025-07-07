@@ -13,6 +13,8 @@ pub enum SetupError {
 
     #[error("Word source does not exist")]
     WordSourceDoesNotExist,
+    #[error("Can not get working directory")]
+    WorkingDirectoryError,
 }
 
 // We need to set up the database, instantiate the WordParser, and then start parsing the words.txt in the root directory and adding the finished words to the database.
@@ -20,21 +22,24 @@ pub enum SetupError {
 /// The setup function gets the path to the initial word source file, opens the file and reads each word from the file calculates the probability and then adds it to the database.
 pub fn setup() -> Result<DB, SetupError> {
     let word_source = std::env::var("WORD_SOURCE").unwrap_or_else(|_| "words.txt".to_string());
+    let wd = get_working_directory()?;
+    let full_path = wd.join(word_source);
+    check_full_path(&full_path)?;
     // set up word analyzer and database
     let mut word_analyzer = WordAnalyzer::new();
     let db = DB::new()?;
     db.setup()?;
-    read_words_from_file(&word_source, &mut word_analyzer)?;
+    read_words_from_file(&full_path, &mut word_analyzer)?;
 
     word_analyzer.finalize_probabilities();
 
-    add_words_to_db(&mut word_analyzer, &db)?;
+    db.batch_insert(word_analyzer.words())?;
 
     Ok(db)
 }
 
 fn read_words_from_file(
-    word_source: &str,
+    word_source: &std::path::Path,
     word_analyzer: &mut WordAnalyzer,
 ) -> Result<(), SetupError> {
     if std::fs::metadata(word_source).is_err() {
@@ -55,43 +60,53 @@ fn read_words_from_file(
     Ok(())
 }
 
-fn add_words_to_db(word_analyzer: &mut WordAnalyzer, db: &DB) -> Result<(), SetupError> {
-    // Pop words from the analyzer and add them to the database until there are no more
-    loop {
-        match word_analyzer.pop() {
-            Ok(Some(word)) => {
-                db.add_word(word)?;
-            }
-            Ok(None) => break,
-            Err(word_analyzer::WordAnalyzerError::ProbabilitiesNotFinalized) => {
-                word_analyzer.finalize_probabilities();
-            }
-        }
-    }
-    Ok(())
-}
+// fn add_words_to_db(word_analyzer: &mut WordAnalyzer, db: &DB) -> Result<(), SetupError> {
+//     // Pop words from the analyzer and add them to the database until there are no more
+//     loop {
+//         match word_analyzer.pop() {
+//             Ok(Some(word)) => {
+//                 db.add_word(word)?;
+//             }
+//             Ok(None) => break,
+//             Err(word_analyzer::WordAnalyzerError::ProbabilitiesNotFinalized) => {
+//                 word_analyzer.finalize_probabilities();
+//             }
+//         }
+//     }
+//     Ok(())
+// }
 
 pub fn change_word_src(game: &GameLoop) -> Result<(), SetupError> {
-    let word_source = get_new_word_source()?;
-    if std::fs::metadata(&word_source).is_err() {
-        return Err(SetupError::WordSourceDoesNotExist);
-    }
+    let wd = get_working_directory()?;
+    let word_source = get_new_word_source_path()?;
+    let full_path = wd.join(&word_source);
+    print!("Changing word source to {}", full_path.display());
+    check_full_path(&full_path)?;
     let mut word_analyzer = WordAnalyzer::new();
-    read_words_from_file(&word_source, &mut word_analyzer)?;
+    read_words_from_file(&full_path, &mut word_analyzer)?;
     // Pop words from the analyzer and add them to the database until there are no more
     word_analyzer.finalize_probabilities();
-    game.db.reset_words()?;
-    add_words_to_db(&mut word_analyzer, &game.db)?;
+    game.db.delete_words()?;
+    game.db.create_words_table()?;
+    game.db.batch_insert(word_analyzer.words())?;
     Ok(())
 }
 
-pub fn get_new_word_source() -> Result<String, SetupError> {
+pub fn get_new_word_source_path() -> Result<String, SetupError> {
     let mut word_source = String::new();
     println!("Enter the path to the new word source file:");
     std::io::stdin().read_line(&mut word_source)?;
-    word_source.trim().to_string();
-    if std::fs::metadata(&word_source).is_err() {
+    Ok(word_source.trim().to_string())
+}
+
+pub fn get_working_directory() -> Result<std::path::PathBuf, SetupError> {
+    let wd = std::env::current_dir().map_err(|_| SetupError::WorkingDirectoryError)?;
+    Ok(wd)
+}
+
+pub fn check_full_path(full_path: &std::path::Path) -> Result<(), SetupError> {
+    if !full_path.exists() {
         return Err(SetupError::WordSourceDoesNotExist);
     }
-    Ok(word_source)
+    Ok(())
 }

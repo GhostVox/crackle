@@ -141,6 +141,9 @@ impl WordAnalyzer {
         }
         Ok(self.word_stack.pop())
     }
+    pub fn words(&self) -> &Vec<Word> {
+        &self.word_stack
+    }
 
     pub fn analyze_word(&mut self, word: &str) -> Result<(), WordError> {
         if word.len() != 5 {
