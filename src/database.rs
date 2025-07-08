@@ -21,25 +21,9 @@ impl DB {
     /// Sets up the database by creating the necessary tables and indexes.
     /// This function is only called if the database does not already exist.
     pub fn setup(&self) -> Result<(), rusqlite::Error> {
-        self.conn.execute(
-            "CREATE TABLE  IF NOT EXISTS words (
-                id INTEGER PRIMARY KEY autoincrement,
-                total_probability REAL,
-                word VARCHAR(5)
-            )",
-            [],
-        )?;
+        self.create_words_table()?;
 
-        self.conn.execute(
-            "CREATE TABLE IF NOT EXISTS game_results(
-        id INTEGER PRIMARY KEY autoincrement,
-        word VARCHAR(5),
-        date DATE DEFAULT CURRENT_DATE,
-        win BOOLEAN NOT NULL,
-        number_of_guesses INTEGER NOT NULL CHECK(number_of_guesses >= 1 AND number_of_guesses <= 6)
-    )",
-            [],
-        )?;
+        self.create_game_results_table()?;
 
         self.conn.execute(
             "CREATE INDEX IF NOT EXISTS word_prob_idx ON words(total_probability)",
@@ -182,7 +166,7 @@ impl DB {
     }
     pub fn create_words_table(&self) -> Result<(), rusqlite::Error> {
         let mut stmt = self.conn.prepare(
-            "CREATE TABLE  IF NOT EXISTS words (
+            "CREATE TABLE IF NOT EXISTS words (
                 id INTEGER PRIMARY KEY autoincrement,
                 total_probability REAL,
                 word VARCHAR(5)
@@ -191,5 +175,26 @@ impl DB {
 
         stmt.execute(params![])?;
         Ok(())
+    }
+    pub fn create_game_results_table(&self) -> Result<(), rusqlite::Error> {
+        let mut stmt = self.conn.prepare(
+            "CREATE TABLE IF NOT EXISTS game_results(
+                id INTEGER PRIMARY KEY autoincrement,
+                word VARCHAR(5),
+                date DATE DEFAULT CURRENT_DATE,
+                win BOOLEAN NOT NULL,
+                number_of_guesses INTEGER NOT NULL CHECK(number_of_guesses >= 1 AND number_of_guesses <= 6)
+            )",
+        )?;
+
+        stmt.execute(params![])?;
+        Ok(())
+    }
+    pub fn new_in_memory() -> Result<Self, rusqlite::Error> {
+        let conn = Connection::open_in_memory()?;
+        let db = Self { conn };
+        db.create_words_table()?;
+        db.create_game_results_table()?;
+        Ok(db)
     }
 }
