@@ -148,8 +148,6 @@ impl GameLoop {
 
     // Parse user input and update game state
     pub fn parse_user_input(&mut self, input: String) {
-        // temp holds yellow characters and excluded characters
-
         let excluded_chars = process_input_characters(self, &input);
         for char in excluded_chars.iter() {
             // If the character was grey in that position, but was in the word earlier add it to the yellow positions stuct so we filter words with that character out later, but don't exclude words entirely with that character
@@ -293,6 +291,14 @@ mod tests {
         let msg = welcome_msg("apple");
         assert!(msg.contains("apple"));
         assert!(msg.contains(EXPECTED_FORMAT))
+    }
+
+    #[test]
+    fn test_check_for_win() {
+        let mut game = create_test_game("apple");
+        game.answer = ['a', 'p', 'p', 'l', 'e'];
+
+        assert!(game.check_for_win());
     }
 
     // Helper function to create a test GameLoop
