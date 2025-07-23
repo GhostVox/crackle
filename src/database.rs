@@ -1,4 +1,4 @@
-use crate::game_loop::GameResults;
+use crate::{config::Config, game_loop::GameResults};
 
 use super::word_analyzer::Word;
 use rusqlite::{Connection, Result, params};
@@ -10,9 +10,9 @@ pub struct DB {
 impl DB {
     /// Creates a new instance of the database.
     /// This function is only called if the database does not already exist.
-    pub fn new() -> Result<Self, rusqlite::Error> {
+    pub fn new(config: &Config) -> Result<Self, rusqlite::Error> {
         Ok(Self {
-            conn: Connection::open("crackle.db")?,
+            conn: Connection::open(&config.app_db)?,
         })
     }
 }
@@ -27,10 +27,6 @@ impl DB {
 
         self.conn.execute(
             "CREATE INDEX IF NOT EXISTS word_prob_idx ON words(total_probability)",
-            [],
-        )?;
-        self.conn.execute(
-            "CREATE INDEX IF NOT EXISTS number_of_guesses_idx ON game_results(number_of_guesses)",
             [],
         )?;
         Ok(())
@@ -194,7 +190,6 @@ impl DB {
         let conn = Connection::open_in_memory()?;
         let db = Self { conn };
         db.create_words_table()?;
-        db.create_game_results_table()?;
         Ok(db)
     }
 }

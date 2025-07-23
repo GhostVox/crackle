@@ -1,4 +1,5 @@
-use crate::{database, filter_logic, word_analyzer::WordAnalyzer};
+use crate::{config::Config, database, filter_logic, word_analyzer::WordAnalyzer};
+
 use rand::Rng;
 use std::{
     collections::{HashMap, HashSet},
@@ -20,7 +21,8 @@ pub struct GameLoop {
 
     pub current_word: String,
     pub answer: [char; 5],
-    pub db: database::DB,
+    pub result_db: database::DB,
+    pub word_db: database::DB,
 }
 
 pub struct GameResults {
@@ -50,7 +52,7 @@ pub enum GameError {
 }
 
 impl GameLoop {
-    pub fn new(db: database::DB) -> Self {
+    pub fn new(word_db: database::DB, result_db: database::DB) -> Self {
         Self {
             number_of_guesses: 0,
             excluded_characters: HashMap::new(),
@@ -59,18 +61,15 @@ impl GameLoop {
 
             current_word: String::from("_____"),
             answer: ['_'; 5], // this gets filled with characters that are green
-            db,
+            word_db,
+            result_db,
         }
     }
 
-    pub fn start(&mut self) -> Result<(), GameError> {
+    pub fn start(&mut self, config: &Config) -> Result<(), GameError> {
         // Get the limit from the environment variable or default to 10
-        let limit = std::env::var("LIMIT")
-            .unwrap_or_else(|_| "10".to_string())
-            .parse()
-            .unwrap_or(10);
-        // Get the top words from the database
-        let top_words = self.db.get_top_words(limit);
+        let limit = config.starting_word_limit as usize; // Get the top words from the database
+        let top_words = self.word_db.get_top_words(limit);
         match top_words {
             Ok(words) => {
                 let rng = rand::thread_rng().gen_range(0..limit);
@@ -172,7 +171,7 @@ impl GameLoop {
             win: self.check_for_win(),
         };
         // Store game_results in database or file
-        self.db
+        self.result_db
             .store_game_results(game_results)
             .map_err(GameError::DatabaseError)?;
         println!("Game results stored successfully!");
@@ -182,7 +181,7 @@ impl GameLoop {
 
     pub fn get_next_guess(&self) -> Option<String> {
         let pattern: String = self.answer.iter().collect::<String>();
-        let potential_words = self.db.filter_words(&pattern);
+        let potential_words = self.word_db.filter_words(&pattern);
         match potential_words {
             Ok(words) => {
                 if words.is_empty() {
@@ -314,7 +313,8 @@ mod tests {
             yellow_characters: HashMap::new(),
             current_word: current_word.to_string(),
             answer: ['_'; 5],
-            db: database::DB::new_in_memory().unwrap(), // Assuming you have this constructor
+            word_db: database::DB::new_in_memory().unwrap(), // Assuming you have this constructor
+            result_db: database::DB::new_in_memory().unwrap(),
         }
     }
 

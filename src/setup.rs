@@ -1,7 +1,5 @@
-use crate::game_loop::GameLoop;
+use crate::database::DB;
 use crate::word_analyzer::WordAnalyzer;
-use crate::{database::DB, word_analyzer};
-use std::io::{BufRead, BufReader};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -20,77 +18,45 @@ pub enum SetupError {
 // We need to set up the database, instantiate the WordParser, and then start parsing the words.txt in the root directory and adding the finished words to the database.
 
 /// The setup function gets the path to the initial word source file, opens the file and reads each word from the file calculates the probability and then adds it to the database.
-pub fn setup() -> Result<DB, SetupError> {
-    let word_source = std::env::var("WORD_SOURCE").unwrap_or_else(|_| "words.txt".to_string());
-    let wd = get_working_directory()?;
-    let full_path = wd.join(word_source);
-    check_full_path(&full_path)?;
-    // set up word analyzer and database
+pub fn setup_word_db(word_src: &str) -> Result<DB, SetupError> {
     let mut word_analyzer = WordAnalyzer::new();
-    let db = DB::new()?;
-    db.setup()?;
-    read_words_from_file(&full_path, &mut word_analyzer)?;
+    let word_db = DB::new_in_memory()?;
+    read_words_from_file(word_src, &mut word_analyzer)?;
 
     word_analyzer.finalize_probabilities();
 
-    db.batch_insert(word_analyzer.words())?;
+    word_db.batch_insert(word_analyzer.words())?;
 
-    Ok(db)
+    Ok(word_db)
 }
 
 fn read_words_from_file(
-    word_source: &std::path::Path,
+    word_source: &str,
     word_analyzer: &mut WordAnalyzer,
 ) -> Result<(), SetupError> {
-    if std::fs::metadata(word_source).is_err() {
-        return Err(SetupError::WordSourceDoesNotExist);
-    }
-    // setup file and reader
-    let _file = std::fs::File::open(word_source)?;
-    let reader = BufReader::new(_file);
-
-    // walk through the file line by line and analyze each word
-
-    for line in reader.lines() {
-        let line = line?;
-        if let Err(err) = word_analyzer.analyze_word(&line) {
+    for line in word_source.lines() {
+        if let Err(err) = word_analyzer.analyze_word(line) {
             eprintln!("Error analyzing word: {err}");
         }
     }
     Ok(())
 }
 
-// fn add_words_to_db(word_analyzer: &mut WordAnalyzer, db: &DB) -> Result<(), SetupError> {
+// pub fn change_word_src(game: &GameLoop) -> Result<(), SetupError> {
+//     let wd = get_working_directory()?;
+//     let word_source = get_new_word_source_path()?;
+//     let full_path = wd.join(&word_source);
+//     print!("Changing word source to {}", full_path.display());
+//     check_full_path(&full_path)?;
+//     let mut word_analyzer = WordAnalyzer::new();
+//     read_words_from_file(&full_path, &mut word_analyzer)?;
 //     // Pop words from the analyzer and add them to the database until there are no more
-//     loop {
-//         match word_analyzer.pop() {
-//             Ok(Some(word)) => {
-//                 db.add_word(word)?;
-//             }
-//             Ok(None) => break,
-//             Err(word_analyzer::WordAnalyzerError::ProbabilitiesNotFinalized) => {
-//                 word_analyzer.finalize_probabilities();
-//             }
-//         }
-//     }
+//     word_analyzer.finalize_probabilities();
+//     game.db.delete_words()?;
+//     game.db.create_words_table()?;
+//     game.db.batch_insert(word_analyzer.words())?;
 //     Ok(())
 // }
-
-pub fn change_word_src(game: &GameLoop) -> Result<(), SetupError> {
-    let wd = get_working_directory()?;
-    let word_source = get_new_word_source_path()?;
-    let full_path = wd.join(&word_source);
-    print!("Changing word source to {}", full_path.display());
-    check_full_path(&full_path)?;
-    let mut word_analyzer = WordAnalyzer::new();
-    read_words_from_file(&full_path, &mut word_analyzer)?;
-    // Pop words from the analyzer and add them to the database until there are no more
-    word_analyzer.finalize_probabilities();
-    game.db.delete_words()?;
-    game.db.create_words_table()?;
-    game.db.batch_insert(word_analyzer.words())?;
-    Ok(())
-}
 
 pub fn get_new_word_source_path() -> Result<String, SetupError> {
     let mut word_source = String::new();
