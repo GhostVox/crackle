@@ -19,13 +19,14 @@
 - **📊 Game Statistics**: Tracks wins, attempts, and performance over time
 - **🎯 Smart Constraint Handling**: Advanced filtering logic for green/yellow/gray letter feedback
 - **📚 Comprehensive Word List**: Extensive vocabulary for better probability calculations
-- **🔄 Dynamic Word Source**: Change word lists on-the-fly through interactive menu
+- **⚙️ Configuration Management**: TOML-based configuration with customizable settings
+- **🔄 Embedded Word List**: Built-in word list for portable execution
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- Rust (2024 edition)
+- Rust (2021 edition or later)
 - SQLite (bundled with rusqlite)
 
 ### Installation
@@ -36,17 +37,15 @@ git clone <your-repo-url>
 cd crackle
 ```
 
-2. **Set up environment variables:**
-```bash
-# Create .env file
-echo "WORD_SOURCE=words.txt" > .env
-echo "LIMIT=10" >> .env
-```
-
-3. **Build and run:**
+2. **Build and run:**
 ```bash
 cargo run
 ```
+
+The application will automatically:
+- Create a configuration file at `~/.config/crackle/config.toml`
+- Set up the game results database at `~/.config/crackle/crackle.db`
+- Use the embedded word list for probability calculations
 
 ## 🎯 How to Use
 
@@ -54,7 +53,7 @@ cargo run
 When you start Crackle, you'll see an interactive menu with options to:
 - **Play** - Start a new Wordle solving session
 - **Generate Report** - View game statistics (coming soon)
-- **Change Word Source** - Switch to a different word list
+- **Change Word Source** - Switch to a different word list (coming soon)
 - **Quit** - Exit the application
 
 ### Game Session
@@ -118,10 +117,13 @@ src/
 ├── database.rs       # SQLite operations and word filtering
 ├── game_loop.rs      # Interactive game logic and user interface
 ├── filter_logic.rs   # Advanced word filtering algorithms
-└── arena.rs          # Testing framework (in development)
+├── config.rs         # Configuration management
+├── arena.rs          # Testing framework (in development)
+└── words.txt         # Embedded comprehensive word list
 
-words.txt             # Default comprehensive word list
-.env                  # Environment configuration
+.github/workflows/    # CI/CD pipelines for testing and releases
+├── test.yml          # Automated testing on multiple platforms
+└── release.yml       # Multi-platform binary releases
 ```
 
 ### Core Components
@@ -131,18 +133,19 @@ words.txt             # Default comprehensive word list
 3. **GameLoop**: Manages interactive gameplay, user input, and game state
 4. **FilterLogic**: Advanced filtering for yellow positions and excluded characters
 5. **Setup**: Initializes database and processes word lists on first run
+6. **Config**: Handles TOML configuration and cross-platform file paths
 
 ### Database Schema
 
 ```sql
--- Stores words with calculated probabilities
+-- Stores words with calculated probabilities (in-memory for gameplay)
 CREATE TABLE words (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     total_probability REAL,
     word VARCHAR(5)
 );
 
--- Tracks game performance
+-- Tracks game performance (persistent storage)
 CREATE TABLE game_results (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     word VARCHAR(5),
@@ -154,9 +157,9 @@ CREATE TABLE game_results (
 
 ### Algorithm Flow
 
-1. **Initialization**: Parse word list, calculate character frequencies by position
+1. **Initialization**: Parse embedded word list, calculate character frequencies by position
 2. **Probability Calculation**: Score each word based on sum of positional character probabilities
-3. **Database Storage**: Store all words with calculated probabilities, indexed for fast retrieval
+3. **In-Memory Storage**: Store all words with calculated probabilities for fast retrieval
 4. **Game Loop**:
    - Retrieve highest probability words from remaining candidates
    - Present random selection from top candidates to user
@@ -166,18 +169,24 @@ CREATE TABLE game_results (
 
 ## ⚙️ Configuration
 
-Environment variables in `.env`:
+Configuration is automatically managed via TOML files at `~/.config/crackle/config.toml`:
 
-- `WORD_SOURCE`: Path to word list file (default: `words.txt`)
-- `LIMIT`: Number of top words to consider for random selection (default: `10`)
+```toml
+word_list_path = "words.txt"           # Path to word list (currently embedded)
+starting_word_limit = 10               # Number of top words to consider for selection
+app_db = "~/.config/crackle/crackle.db" # Path to persistent game results database
+```
 
 ## 📦 Dependencies
 
 - **rusqlite**: SQLite database operations with bundled SQLite
 - **thiserror**: Error handling and custom error types
-- **dotenv**: Environment variable management
+- **dotenv**: Environment variable management (legacy support)
 - **rand**: Random selection from top probability words
 - **dialoguer**: Interactive CLI menus and prompts
+- **serde**: Configuration serialization/deserialization
+- **toml**: TOML configuration file parsing
+- **dirs**: Cross-platform configuration directory detection
 
 ## 📊 Game Statistics
 
@@ -194,9 +203,9 @@ Statistics are stored in the SQLite database for future reporting features.
 Comprehensive error handling for:
 - Invalid input formats (wrong length, invalid characters)
 - Database connection issues
-- Word list parsing problems
+- Configuration file problems
 - File I/O errors
-- Missing word source files
+- Word analysis errors
 
 ## 🧪 Testing
 
@@ -205,23 +214,33 @@ The project includes comprehensive unit tests for:
 - Game state management and user input parsing
 - Word analysis and probability calculations
 - Database operations
+- Configuration management
 
 Run tests with:
 ```bash
 cargo test
 ```
 
+## 🚀 Release Pipeline
+
+Automated GitHub Actions workflows provide:
+- **Continuous Testing**: Tests on Ubuntu, Windows, and macOS
+- **Multi-Platform Releases**: Automated binary builds for:
+  - Windows (x86_64, i686)
+  - Linux (x86_64)
+  - macOS (Intel x86_64, Apple Silicon ARM64)
+
 ## 🚧 Known Issues & TODO
 
-### Issues to Fix
+### Current Issues
 - [ ] Fix filtering logic for duplicate characters where first is green and second is gray
 - [ ] Improve handling of repeated letters in complex scenarios
 
 ### Features in Development
 - [ ] Enhanced terminal UI experience
 - [ ] Comprehensive game statistics and reporting
+- [ ] Word source selection functionality
 - [ ] Performance analytics and optimization suggestions
-- [ ] Testing arena for algorithm validation
 
 ### Planned Enhancements
 - [ ] Hard mode support (must use revealed letters)
@@ -232,10 +251,10 @@ cargo test
 
 ## 📈 Performance Notes
 
-- **First Run**: Processes entire word list and builds database (may take a few seconds)
-- **Subsequent Runs**: Fast startup as database is pre-populated
-- **Word Filtering**: Uses indexed SQL queries for optimal performance
-- **Memory Usage**: Minimal as words are streamed from database rather than held in memory
+- **First Run**: Processes embedded word list and builds in-memory database (fast startup)
+- **Subsequent Runs**: Quick startup with pre-analyzed word probabilities
+- **Word Filtering**: Uses efficient constraint-based filtering for optimal performance
+- **Memory Usage**: Balanced approach using in-memory analysis with persistent result storage
 
 ## 🤝 Contributing
 
