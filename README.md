@@ -43,8 +43,8 @@ cargo run
 ```
 
 The application will automatically:
-- Create a configuration file at `~/.config/crackle/config.toml`
-- Set up the game results database at `~/.config/crackle/crackle.db`
+- Create a configuration file at your platform's configuration directory
+- Set up the game results database alongside the configuration
 - Use the embedded word list for probability calculations
 
 ## 🎯 How to Use
@@ -169,12 +169,16 @@ CREATE TABLE game_results (
 
 ## ⚙️ Configuration
 
-Configuration is automatically managed via TOML files at `~/.config/crackle/config.toml`:
+Configuration is automatically managed via TOML files in your platform's standard configuration directory:
+
+- **Linux**: `~/.config/crackle/config.toml`
+- **macOS**: `~/Library/Application Support/crackle/config.toml`
+- **Windows**: `%APPDATA%\crackle\config.toml`
 
 ```toml
 word_list_path = "words.txt"           # Path to word list (currently embedded)
 starting_word_limit = 10               # Number of top words to consider for selection
-app_db = "~/.config/crackle/crackle.db" # Path to persistent game results database
+app_db = "[config_dir]/crackle.db"    # Path to persistent game results database
 ```
 
 ## 📦 Dependencies
