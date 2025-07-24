@@ -75,7 +75,7 @@ impl GameLoop {
                 let rng = rand::thread_rng().gen_range(0..limit);
 
                 self.current_word = words[rng].clone().as_str();
-                self.number_of_guesses = 1;
+                self.number_of_guesses += 1;
             }
             Err(e) => return Err(GameError::DatabaseError(e)),
         }
@@ -83,7 +83,7 @@ impl GameLoop {
         welcome_msg(&self.current_word);
 
         loop {
-            if self.number_of_guesses > MAX_GUESSES {
+            if self.number_of_guesses >= MAX_GUESSES {
                 println!("Damn we will get it next time.");
                 self.store_game_results()?;
 
