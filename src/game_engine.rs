@@ -2,7 +2,6 @@ use std::collections::HashMap;
 // the game engine, manages game state and logic for the game
 
 pub struct GameEngine {
-    number_of_guesses: u8,
     excluded_characters: HashMap<char, bool>,
     // uses a key of character + position
     yellow_positions: HashMap<(char, usize), bool>,

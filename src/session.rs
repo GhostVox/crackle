@@ -32,6 +32,8 @@ impl<'c, I: InputSource, O: OutputSink> Session<'c, I, O> {
         }
     }
 
+    //IMPORTANT: we need to make sure the main function handles the errors propagated from here
+
     /// Starts the game session, initializes the game engine with the starting word .
     pub fn initalize(&mut self) -> Result<(), FatalError> {
         let words = self
@@ -47,4 +49,6 @@ impl<'c, I: InputSource, O: OutputSink> Session<'c, I, O> {
 
         Ok(())
     }
+
+    fn interactive_session(&self) {}
 }
