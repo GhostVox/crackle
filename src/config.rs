@@ -6,8 +6,9 @@ use toml;
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Config {
     pub word_list_path: String,
-    pub starting_word_limit: u32,
+    pub starting_word_limit: u8,
     pub app_db: PathBuf,
+    pub max_guesses: u8,
 }
 
 impl Default for Config {
@@ -19,12 +20,13 @@ impl Default for Config {
                 .unwrap()
                 .join("crackle")
                 .join("crackle.db"),
+            max_guesses: 6,
         }
     }
 }
 
 impl Config {
-    pub fn new(word_list_path: String, starting_word_limit: u32) -> Self {
+    pub fn new(word_list_path: String, starting_word_limit: u8) -> Self {
         Config {
             word_list_path,
             starting_word_limit,
@@ -32,11 +34,22 @@ impl Config {
                 .unwrap()
                 .join("crackle")
                 .join("crackle.db"),
+            max_guesses: 6,
         }
     }
 
     fn update_app_db(&mut self, app_db: PathBuf) {
         self.app_db = app_db;
+    }
+
+    //TODO: maybe change to smaller size for preformance
+    pub fn get_limit(&self) -> u8 {
+        self.starting_word_limit
+    }
+
+    //TODO: maybe change to smaller size like u8 for preformance
+    pub fn get_max_guesses(&self) -> u8 {
+        self.max_guesses
     }
 }
 

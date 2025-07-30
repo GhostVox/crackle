@@ -68,7 +68,7 @@ impl DB {
     }
 
     /// Gets the words with the highest probability from the database. Requires a limit to be specified.
-    pub fn get_top_words(&self, limit: usize) -> Result<Vec<Word>, rusqlite::Error> {
+    pub fn get_top_words(&self, limit: u8) -> Result<Vec<Word>, rusqlite::Error> {
         let mut stmt = self.conn.prepare(
             "SELECT word, total_probability FROM words ORDER BY total_probability DESC LIMIT ?1",
         )?;
