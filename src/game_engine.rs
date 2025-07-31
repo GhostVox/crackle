@@ -111,6 +111,12 @@ mod tests {
     }
 
     #[test]
+    fn test_get_pattern() {
+        let engine = create_test_engine("apple");
+        assert_eq!(engine.get_pattern(), "apple");
+    }
+
+    #[test]
     fn test_setting_starting_word() {
         let mut engine = create_test_engine("apple");
         engine.set_starting_word(String::from("water"));

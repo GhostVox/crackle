@@ -2,11 +2,11 @@ use std::io::Read;
 
 use crate::input::InputSource;
 
-pub struct ApiInput<I: Read> {
-    reader: I,
+pub struct ApiInput<R: Read> {
+    reader: R,
 }
 
-impl<I: Read> InputSource for ApiInput<I> {
+impl<R: Read> InputSource for ApiInput<R> {
     fn get_feedback(&mut self) -> Result<String, std::io::Error> {
         unimplemented!()
     }
