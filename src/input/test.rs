@@ -2,6 +2,7 @@ use std::io::Read;
 
 use crate::input::InputSource;
 
+#[allow(dead_code)]
 pub struct TestInput<R: Read> {
     reader: R,
 }

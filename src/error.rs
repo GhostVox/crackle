@@ -13,7 +13,7 @@ pub enum FatalError {
     WordAnalyzer(String),
 
     #[error("Failed to write to standard output: {0}")]
-    WriteError(#[from] std::io::Error),
+    IOError(#[from] std::io::Error),
 }
 
 #[derive(Error, Debug)]

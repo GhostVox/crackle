@@ -1,7 +1,7 @@
 use std::io::Read;
 
 use crate::input::InputSource;
-
+#[allow(dead_code)]
 pub struct ApiInput<R: Read> {
     reader: R,
 }

@@ -23,3 +23,20 @@ fn check_input(input: &str) -> Result<(), RecoverableError> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_check_input() {
+        // Valid input: correct length and format
+        assert!(check_input("gyngy").is_ok());
+        // Invalid input: too long
+        assert!(check_input("gyngyy").is_err());
+        // Invalid input: too short
+        assert!(check_input("gyn").is_err());
+        // Invalid input: wrong characters
+        assert!(check_input("abcde").is_err());
+    }
+}

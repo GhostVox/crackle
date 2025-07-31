@@ -1,6 +1,4 @@
-use crate::constants::EXPECTED_FORMAT;
 use crate::output::OutputSink;
-use colored::Colorize;
 use std::io::Write;
 
 pub struct InteractiveOutput<W: Write> {
@@ -42,7 +40,7 @@ mod tests {
     fn test_fatal_error_msg() {
         let buffer = Vec::new();
         let mut output = InteractiveOutput::new(buffer);
-        output.fatal_error("Houstin we have a problem");
+        output.fatal_error("Houstin we have a problem").unwrap();
         let msg = String::from_utf8(output.into_inner()).unwrap();
         assert!(msg.contains("Fatal error: Houstin we have a problem"));
     }

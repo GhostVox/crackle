@@ -1,4 +1,4 @@
-use crate::{config::Config, game_loop::GameResults};
+use crate::{config::Config, session::SessionResults};
 
 use super::word_analyzer::Word;
 use rusqlite::{Connection, Result, params};
@@ -23,7 +23,7 @@ impl DB {
     pub fn setup(&self) -> Result<(), rusqlite::Error> {
         self.create_words_table()?;
 
-        self.create_game_results_table()?;
+        self.create_session_table()?;
 
         self.conn.execute(
             "CREATE INDEX IF NOT EXISTS word_prob_idx ON words(total_probability)",
@@ -90,31 +90,50 @@ impl DB {
         Ok(words)
     }
 
-    /// Stores the results of a game in the database.
+    /// Stores the complete results of a game session in the database.
+    ///
+    /// This function takes all the data from a `SessionResults` struct and inserts it
+    /// as a new row in the `session_results` table. It handles the conversion of
+    /// complex types like `Uuid` and `DateTime<Utc>` into a text format suitable for SQLite.
     ///
     /// # Arguments
     ///
-    /// * `game_results` - The results of the game to store.
-    /// ```
-    /// struct GameResults {
-    ///     word: String,
-    ///     number_of_guesses: usize,
-    ///     win: bool,
-    /// }
-    /// ```
-    /// # Returns
+    /// * `session_results` - A reference to the `SessionResults` struct to be stored.
     ///
-    /// * `Ok(())` - The results were successfully stored.
-    /// * `Err(rusqlite::Error)` - An error occurred while storing the results.
-    pub fn store_game_results(&self, game_results: GameResults) -> Result<(), rusqlite::Error> {
-        let mut stmt = self.conn.prepare(
-            "INSERT INTO game_results (word, number_of_guesses, win) VALUES (?1, ?2, ?3)",
-        )?;
+    /// # Errors
+    ///
+    /// Returns an `Err` variant of `rusqlite::Error` if the SQL statement cannot be
+    /// prepared or executed. This could happen if the table schema does not match,
+    /// the connection is invalid, or other database-level issues occur.
+    pub fn store_session_results(
+        &self,
+        session_results: &SessionResults,
+    ) -> Result<(), rusqlite::Error> {
+        // The SQL statement now includes all the columns from the session_results table.
+        let sql = "
+               INSERT INTO session_results (
+                   session_id,
+                   start_date,
+                   end_date,
+                   session_type,
+                   word,
+                   number_of_guesses,
+                   win
+               ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+           ";
+
+        let mut stmt = self.conn.prepare(sql)?;
+
         stmt.execute(params![
-            game_results.word,
-            game_results.number_of_guesses,
-            game_results.win
+            session_results.session_id.to_string(),
+            session_results.start_date.to_rfc3339(), // ISO 8601 format
+            session_results.end_date.to_rfc3339(),   // ISO 8601 format
+            session_results.session_type,
+            session_results.word,
+            session_results.number_of_guesses,
+            session_results.win,
         ])?;
+
         Ok(())
     }
 
@@ -172,15 +191,17 @@ impl DB {
         stmt.execute(params![])?;
         Ok(())
     }
-    pub fn create_game_results_table(&self) -> Result<(), rusqlite::Error> {
+    pub fn create_session_table(&self) -> Result<(), rusqlite::Error> {
         let mut stmt = self.conn.prepare(
-            "CREATE TABLE IF NOT EXISTS game_results(
-                id INTEGER PRIMARY KEY autoincrement,
-                word VARCHAR(5),
-                date DATE DEFAULT CURRENT_DATE,
-                win BOOLEAN NOT NULL,
-                number_of_guesses INTEGER NOT NULL CHECK(number_of_guesses >= 1 AND number_of_guesses <= 6)
-            )",
+            "CREATE TABLE IF NOT EXISTS session_results (
+                session_id        TEXT PRIMARY KEY NOT NULL,
+                start_date        TEXT NOT NULL,
+                end_date          TEXT NOT NULL,
+                session_type      TEXT NOT NULL,
+                word              TEXT NOT NULL,
+                number_of_guesses INTEGER NOT NULL,
+                win               BOOLEAN NOT NULL
+            ",
         )?;
 
         stmt.execute(params![])?;

@@ -14,7 +14,17 @@ pub struct GameEngine {
     answer: [char; 5],
     current_guess: String,
 }
-
+impl Default for GameEngine {
+    fn default() -> Self {
+        Self {
+            excluded_characters: HashMap::new(),
+            yellow_positions: HashMap::new(),
+            yellow_characters: HashMap::new(),
+            answer: ['_'; 5],
+            current_guess: String::new(),
+        }
+    }
+}
 impl GameEngine {
     /// Creates a new instance of the game engine.
     pub fn new() -> Self {
@@ -27,17 +37,20 @@ impl GameEngine {
         }
     }
 
+    /// Sets the starting word for the engine to use for the first user input.
     pub fn set_starting_word(&mut self, starting_word: String) {
         self.current_guess = starting_word;
     }
+
+    /// Gives the current guess of the engine back to the caller.
     pub fn get_current_guess(&self) -> &str {
         &self.current_guess
     }
 
-    pub fn parse_input(&mut self, input: String) {
-        let excluded_chars = self.process_input_characters(&input);
+    /// Parses the user input by getting a list of excluded characters from process_input_characters, It then checks the engine's state to make sure the characters in vector from process_input_characters are not included in the answer and updates the engine's state accordingly.
+    pub fn parse_input(&mut self, input: &str) {
+        let excluded_chars = self.process_input_characters(input);
         for char in excluded_chars.iter() {
-            // If the character was grey in that position, but was in the word earlier add it to the yellow positions stuct so we filter words with that character out later, but don't exclude words entirely with that character
             if self.answer.contains(char) {
                 self.yellow_characters.insert(*char, true);
                 continue;
@@ -46,6 +59,7 @@ impl GameEngine {
         }
     }
 
+    /// Processes the input characters by comparing against the current guess and updates the engine's state accordingly.
     fn process_input_characters(&mut self, input: &str) -> HashSet<char> {
         let mut excluded_chars = HashSet::new();
         for (i, c) in input.chars().enumerate() {
@@ -74,6 +88,8 @@ impl GameEngine {
         }
         excluded_chars
     }
+
+    /// Takes a list of possible words for the next guess and calls filter_logic::filter_potential_words to get a list of words that match the current constraints of the game. Then it calculates the probabilities of the subset of words, and gets the most probable word.
     pub fn get_next_guess(&self, possible_words: Vec<String>) -> Result<String, RecoverableError> {
         let filtered_words = filter_logic::filter_potential_words(
             possible_words,
@@ -87,16 +103,20 @@ impl GameEngine {
             let _result = word_analyzer.analyze_word(&word);
         }
         word_analyzer.finalize_probabilities();
-        let next_guess = word_analyzer
+        word_analyzer
             .get_most_probable_word()
-            .map(|word| word.as_str().to_string())
-            .ok_or(RecoverableError::NoGuessFound);
-        next_guess
+            .map(|word| word.as_str())
+            .ok_or(RecoverableError::NoGuessFound)
     }
 
+    /// Returns the current state of the answer to the caller to be used to query the database.
     pub fn get_pattern(&self) -> String {
         let pattern: String = self.answer.iter().collect::<String>();
         pattern
+    }
+    /// Checks if the current guess matches the answer.
+    pub fn check_for_win(&self) -> bool {
+        !self.answer.contains(&'_')
     }
 }
 
@@ -111,15 +131,23 @@ mod tests {
     }
 
     #[test]
+    fn test_check_for_win() {
+        let mut engine = create_test_engine("apple");
+        engine.parse_input("ggggg");
+        assert!(engine.check_for_win());
+    }
+
+    #[test]
     fn test_get_pattern() {
-        let engine = create_test_engine("apple");
-        assert_eq!(engine.get_pattern(), "apple");
+        let mut engine = create_test_engine("apple");
+        engine.parse_input("gngng");
+        assert_eq!(engine.get_pattern(), "a_p_e");
     }
 
     #[test]
     fn test_setting_starting_word() {
-        let mut engine = create_test_engine("apple");
-        engine.set_starting_word(String::from("water"));
+        let mut engine = create_test_engine("water");
+        engine.process_input_characters("ggggg");
         assert_eq!(engine.answer, ['w', 'a', 't', 'e', 'r']);
     }
 

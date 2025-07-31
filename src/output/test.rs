@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use crate::output::OutputSink;
-
+#[allow(dead_code)]
 pub struct TestOutput<W: Write> {
     writer: W,
 }

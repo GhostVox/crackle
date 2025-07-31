@@ -5,23 +5,32 @@ pub struct InteractiveInput<R: BufRead> {
     reader: R,
 }
 
+impl<R: BufRead> InteractiveInput<R> {
+    pub fn new(reader: R) -> Self {
+        Self { reader }
+    }
+}
+
 impl<R: BufRead> InputSource for InteractiveInput<R> {
     fn get_feedback(&mut self) -> Result<String, std::io::Error> {
-        let mut input = String::new();
-        self.reader.read_line(&mut input)?;
+        loop {
+            let mut input = String::new();
+            self.reader.read_line(&mut input)?;
 
-        let input = input.trim().to_lowercase();
-        if input == "exit" {
-            println!("Exiting game");
-            std::process::exit(0);
-        }
-        let input_ok = check_input(&input);
-        match input_ok {
-            Err(e) => Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "Invalid input",
-            )),
-            Ok(_) => Ok(input),
+            let input = input.trim().to_lowercase();
+            if input == "exit" {
+                println!("Exiting game");
+                return Err(std::io::Error::other("Exiting game"));
+            }
+
+            let input_ok = check_input(&input);
+            match input_ok {
+                Ok(_) => return Ok(input),
+                Err(e) => {
+                    println!("Invalid input: {e}. Please try again.");
+                    continue;
+                }
+            }
         }
     }
 

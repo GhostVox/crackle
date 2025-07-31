@@ -2,6 +2,7 @@ use std::io::Write;
 
 use crate::output::OutputSink;
 
+#[allow(dead_code)]
 pub struct ApiOutput<W: Write> {
     writer: W,
 }
