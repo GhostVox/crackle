@@ -19,7 +19,7 @@ impl<R: BufRead> InputSource for InteractiveInput<R> {
 
             let input = input.trim().to_lowercase();
             if input == "exit" {
-                println!("Exiting game");
+                println!("Exiting session");
                 return Err(std::io::Error::other("Exiting game"));
             }
 

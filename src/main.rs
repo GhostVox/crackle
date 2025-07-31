@@ -30,9 +30,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     loop {
         let err = menu(&in_memory_word_db, &result_db, &config);
-        if let Err(err) = err {
-            println!("Error in menu: {err}");
-            break;
+        match err {
+            Ok(_) => {}
+            Err(err) => {
+                let msg = err.to_string();
+                if msg.contains("Exit") {
+                    continue;
+                } else {
+                    println!("Error in menu: {err}");
+                    break;
+                }
+            }
         }
     }
 
@@ -59,7 +67,7 @@ fn menu(
         0 => interactive_session(config, result_db, in_memory_db)?,
         1 => todo!(),
         // 2 => change_word_src(game)?,
-        3 => return Err("exit".into()),
+        3 => std::process::exit(0),
         _ => unreachable!(),
     }
     Ok(())

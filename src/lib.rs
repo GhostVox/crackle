@@ -9,5 +9,6 @@ pub mod error;
 pub mod filter_logic;
 pub mod game_engine;
 pub mod input;
+pub mod logs;
 pub mod output;
 pub mod session;

@@ -1,11 +1,12 @@
-use crate::DB;
 use crate::config::Config;
 use crate::constants::EXPECTED_FORMAT;
 use crate::error::FatalError;
 use crate::game_engine::GameEngine;
 use crate::input::InputSource;
 use crate::output::OutputSink;
+use crate::{DB, logs};
 use colored::Colorize;
+use std::fmt::{Display, format};
 
 use rand::Rng;
 use uuid::Uuid;
@@ -26,6 +27,13 @@ impl SessionType {
         }
     }
 }
+
+impl Display for SessionType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
 pub struct SessionResults {
     pub session_id: Uuid,
     pub start_date: chrono::DateTime<chrono::Utc>,
@@ -48,6 +56,15 @@ pub struct Session<'c, 'a, I: InputSource, O: OutputSink> {
     output_sink: O,
     number_of_guesses: u8,
     config: &'c Config,
+}
+impl<'c, 'a, I: InputSource, O: OutputSink> Display for Session<'c, 'a, I, O> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Session ID: {}\nSession Type: {}\nStart Date: {} {}\nGame Engine: {}",
+            self.session_id, self.session_type, self.start_date, self.game_engine, self.game_engine
+        )
+    }
 }
 
 impl<'c, 'a, I: InputSource, O: OutputSink> Session<'c, 'a, I, O> {
@@ -123,6 +140,9 @@ impl<'c, 'a, I: InputSource, O: OutputSink> Session<'c, 'a, I, O> {
                 Ok(guess) => guess,
                 Err(e) => {
                     println!("I am stumped! {e}");
+                    let session_state = format!("{self}");
+                    logs::log_session_state(session_state)?;
+
                     return self.store_session_results();
                 }
             };
@@ -163,9 +183,10 @@ fn welcome() {
     println!("Welcome to Crackle!\r\n");
     println!("I will give you a word to try based on positional frequency");
     println!(
-        "To achieve this, you will need to enter {}, {}, and N for gray",
+        "To achieve this, you will need to enter {}, {}, and {}",
         "G for green".green(),
-        "Y for yellow".yellow()
+        "Y for yellow".yellow(),
+        "N for gray".bright_black()
     );
     println!("Example: {EXPECTED_FORMAT}");
 }

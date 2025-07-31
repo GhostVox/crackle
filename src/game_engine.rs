@@ -3,6 +3,8 @@ use crate::filter_logic;
 use crate::word_analyzer::WordAnalyzer;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::mem::Discriminant;
+use std::path::Display;
 // the game engine, manages game state and logic for the game
 
 pub struct GameEngine {
@@ -23,6 +25,19 @@ impl Default for GameEngine {
             answer: ['_'; 5],
             current_guess: String::new(),
         }
+    }
+}
+impl std::fmt::Display for GameEngine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "GameEngine {{ excluded_characters: {:?}, yellow_positions: {:?}, yellow_characters: {:?}, answer: {:?}, current_guess: {:?} }}",
+            self.excluded_characters,
+            self.yellow_positions,
+            self.yellow_characters,
+            self.answer,
+            self.current_guess
+        )
     }
 }
 impl GameEngine {
