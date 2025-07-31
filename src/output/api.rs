@@ -15,7 +15,7 @@ impl<W: Write> OutputSink for ApiOutput<W> {
         todo!("fatal_error")
     }
 
-    fn welcome(&mut self, first_guess: &str) -> Result<(), std::io::Error> {
-        todo!("welcome")
+    fn out_of_guesses(&mut self) -> Result<(), std::io::Error> {
+        todo!("out_of_guesses")
     }
 }

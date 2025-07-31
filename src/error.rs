@@ -1,3 +1,4 @@
+use crate::constants::WORD_LENGTH;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -19,6 +20,15 @@ pub enum FatalError {
 pub enum RecoverableError {
     #[error("Invalid input format: expected 'gyngy' format, got '{0}'")]
     InvalidInputFormat(String),
+
+    #[error("Invalid input: {0}")]
+    InputError(String),
+
+    #[error("Invalid word length: expected {WORD_LENGTH}, got {0}")]
+    InvalidWordLength(usize),
+
+    #[error("No guess found")]
+    NoGuessFound,
 
     #[error("No words match current constraints")]
     NoMatchingWords,

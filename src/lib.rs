@@ -4,6 +4,7 @@ pub mod setup;
 pub mod word_analyzer;
 pub use database::DB;
 pub mod config;
+pub mod constants;
 pub mod error;
 pub mod filter_logic;
 pub mod game_engine;
