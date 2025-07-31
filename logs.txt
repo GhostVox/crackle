@@ -1,0 +1,4 @@
+Session ID: cba4ca33-7c88-49a9-807c-aab729363503
+Session Type: Interactive
+Start Date: 2025-07-31 19:29:57.724404529 UTC GameEngine { excluded_characters: {'a': true, 'e': true, 's': true, 'm': true}, yellow_positions: {('r', 2): true}, yellow_characters: {'r': true}, answer: ['m', 'a', '_', '_', '_'], current_guess: "mares" }
+Game Engine: GameEngine { excluded_characters: {'a': true, 'e': true, 's': true, 'm': true}, yellow_positions: {('r', 2): true}, yellow_characters: {'r': true}, answer: ['m', 'a', '_', '_', '_'], current_guess: "mares" }

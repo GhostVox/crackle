@@ -6,11 +6,11 @@ use crate::input::InputSource;
 use crate::output::OutputSink;
 use crate::{DB, logs};
 use colored::Colorize;
-use std::fmt::{Display, format};
+use std::fmt::Display;
 
 use rand::Rng;
 use uuid::Uuid;
-
+#[derive(Debug)]
 pub enum SessionType {
     Interactive,
     Test,
@@ -54,6 +54,7 @@ pub struct Session<'c, 'a, I: InputSource, O: OutputSink> {
     in_memory_db: &'a DB,
     input_source: I,
     output_sink: O,
+    words_guessed: Vec<String>,
     number_of_guesses: u8,
     config: &'c Config,
 }
@@ -61,8 +62,16 @@ impl<'c, 'a, I: InputSource, O: OutputSink> Display for Session<'c, 'a, I, O> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Session ID: {}\nSession Type: {}\nStart Date: {} {}\nGame Engine: {}",
-            self.session_id, self.session_type, self.start_date, self.game_engine, self.game_engine
+            "Session ID: {:?}\n
+            Session Type: {:?}\n
+            Start Date: {:?}\n
+            Words Guessed: {:#?}\n
+            Game Engine: {}\n",
+            self.session_id,
+            self.session_type,
+            self.start_date,
+            self.words_guessed,
+            self.game_engine
         )
     }
 }
@@ -85,6 +94,7 @@ impl<'c, 'a, I: InputSource, O: OutputSink> Session<'c, 'a, I, O> {
             in_memory_db,
             input_source: input,
             output_sink: output,
+            words_guessed: Vec::new(),
             number_of_guesses: 0,
             config,
         }
@@ -101,6 +111,7 @@ impl<'c, 'a, I: InputSource, O: OutputSink> Session<'c, 'a, I, O> {
         let rng = rand::thread_rng().gen_range(0..words.len());
 
         let starting_word = words[rng].clone().as_str();
+        self.words_guessed.push(starting_word.clone());
         self.game_engine.set_starting_word(starting_word);
 
         Ok(())
@@ -147,6 +158,7 @@ impl<'c, 'a, I: InputSource, O: OutputSink> Session<'c, 'a, I, O> {
                 }
             };
 
+            self.words_guessed.push(next_guess.clone());
             self.output_sink.output_guess(&next_guess)?;
         }
     }

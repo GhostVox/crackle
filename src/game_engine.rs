@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use std::mem::Discriminant;
 use std::path::Display;
 // the game engine, manages game state and logic for the game
-
+#[derive(Debug)]
 pub struct GameEngine {
     excluded_characters: HashMap<char, bool>,
     // uses a key of character + position
@@ -27,17 +27,11 @@ impl Default for GameEngine {
         }
     }
 }
+#[allow(clippy::uninlined_format_args)]
 impl std::fmt::Display for GameEngine {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "GameEngine {{ excluded_characters: {:?}, yellow_positions: {:?}, yellow_characters: {:?}, answer: {:?}, current_guess: {:?} }}",
-            self.excluded_characters,
-            self.yellow_positions,
-            self.yellow_characters,
-            self.answer,
-            self.current_guess
-        )
+        // Just add '#' to the debug formatter
+        write!(f, "{:#?}", self)
     }
 }
 impl GameEngine {
@@ -105,7 +99,10 @@ impl GameEngine {
     }
 
     /// Takes a list of possible words for the next guess and calls filter_logic::filter_potential_words to get a list of words that match the current constraints of the game. Then it calculates the probabilities of the subset of words, and gets the most probable word.
-    pub fn get_next_guess(&self, possible_words: Vec<String>) -> Result<String, RecoverableError> {
+    pub fn get_next_guess(
+        &mut self,
+        possible_words: Vec<String>,
+    ) -> Result<String, RecoverableError> {
         let filtered_words = filter_logic::filter_potential_words(
             possible_words,
             &self.yellow_positions,
@@ -118,10 +115,16 @@ impl GameEngine {
             let _result = word_analyzer.analyze_word(&word);
         }
         word_analyzer.finalize_probabilities();
-        word_analyzer
+        let next_guess = word_analyzer
             .get_most_probable_word()
-            .map(|word| word.as_str())
-            .ok_or(RecoverableError::NoGuessFound)
+            .map(|word| word.as_str());
+        match next_guess {
+            Some(word) => {
+                self.current_guess = word.to_string();
+                Ok(word.to_string())
+            }
+            None => Err(RecoverableError::NoGuessFound),
+        }
     }
 
     /// Returns the current state of the answer to the caller to be used to query the database.
