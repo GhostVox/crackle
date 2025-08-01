@@ -1,15 +1,31 @@
 use crackle::{
     config::{Config, get_config},
     database,
-    input::InteractiveInput,
-    output::InteractiveOutput,
+    input::{InteractiveInput, TestInput},
+    output::{InteractiveOutput, TestOutput},
     session::Session,
     session::SessionType,
     setup::{self},
+    shared_state::SharedTestState,
 };
 use dialoguer::{Select, theme::ColorfulTheme};
+use std::cell::RefCell;
 use std::fs;
 use std::io::BufReader;
+use std::rc::Rc;
+
+// #[derive(Default)]
+// pub struct SharedTestState {
+//     pub guesses: Vec<String>,
+// }
+
+// impl SharedTestState {
+//     pub fn new() -> Self {
+//         Self {
+//             guesses: Vec::new(),
+//         }
+//     }
+// }
 
 // we need to make sure the crackle db exists in the app config directory and then create it if it doesn't, also we need to make a in memory word db to query.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -54,6 +70,7 @@ fn menu(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let selections = &[
         "Interactive Session",
+        "Test Session",
         "Generate Report",
         "Change Word Source",
         "Quit",
@@ -65,9 +82,9 @@ fn menu(
         .unwrap();
     match selection {
         0 => interactive_session(config, result_db, in_memory_db)?,
-        1 => todo!(),
+        1 => test_session(config, result_db, in_memory_db)?,
         // 2 => change_word_src(game)?,
-        3 => std::process::exit(0),
+        4 => std::process::exit(0),
         _ => unreachable!(),
     }
     Ok(())
@@ -91,5 +108,42 @@ fn interactive_session(
     );
     session.initialize()?;
     session.start_interactive()?;
+    Ok(())
+}
+
+fn test_session(
+    config: &Config,
+    result_db: &database::DB,
+    in_memory_db: &database::DB,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let runs = config.test_runs;
+
+    for _ in 0..runs {
+        let random_word = in_memory_db.get_random_word()?;
+
+        let shared_state = Rc::new(RefCell::new(SharedTestState::new()));
+        let input = TestInput::new(random_word, Rc::clone(&shared_state));
+        let output = TestOutput::new(Rc::clone(&shared_state));
+        let mut session = Session::new(
+            SessionType::Test,
+            input,
+            output,
+            config,
+            result_db,
+            in_memory_db,
+        );
+        session.initialize()?;
+        session.start_test_session()?;
+    }
+
+    Ok(())
+}
+
+#[allow(dead_code, unused_variables)]
+fn api_session(
+    config: &Config,
+    result_db: &database::DB,
+    in_memory_db: &database::DB,
+) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }

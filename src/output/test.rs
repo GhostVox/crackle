@@ -1,19 +1,33 @@
-use std::io::Write;
+use std::{cell::RefCell, io::Write, rc::Rc};
 
-use crate::output::OutputSink;
+use crate::{output::OutputSink, shared_state::SharedTestState};
 #[allow(dead_code)]
-pub struct TestOutput<W: Write> {
-    writer: W,
+pub struct TestOutput {
+    writer: Option<Box<dyn Write>>,
+    shared_state: Rc<RefCell<SharedTestState>>,
+}
+
+impl TestOutput {
+    pub fn new(shared_state: Rc<RefCell<SharedTestState>>) -> Self {
+        TestOutput {
+            writer: None,
+            shared_state,
+        }
+    }
 }
 
 #[allow(unused_variables)]
-impl<W: Write> OutputSink for TestOutput<W> {
+impl OutputSink for TestOutput {
     fn fatal_error(&mut self, msg: &str) -> Result<(), std::io::Error> {
         todo!("Implement fatal_error method")
     }
 
     fn output_guess(&mut self, guess: &str) -> Result<(), std::io::Error> {
-        todo!("Implement output_guess method")
+        self.shared_state
+            .borrow_mut()
+            .guesses
+            .push(guess.to_string());
+        Ok(())
     }
 
     fn out_of_guesses(&mut self) -> Result<(), std::io::Error> {

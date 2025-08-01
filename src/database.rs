@@ -22,8 +22,10 @@ impl DB {
     /// This function is only called if the database does not already exist.
     pub fn setup(&self) -> Result<(), rusqlite::Error> {
         self.create_words_table()?;
+        self.create_word_idx()?;
 
         self.create_session_table()?;
+        self.create_session_idx()?;
 
         self.conn.execute(
             "CREATE INDEX IF NOT EXISTS word_prob_idx ON words(total_probability)",
@@ -173,6 +175,18 @@ impl DB {
         word_iter.collect()
     }
 
+    pub fn get_random_word(&self) -> Result<String, rusqlite::Error> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT word FROM words ORDER BY RANDOM() LIMIT 1")?;
+
+        let word_iter = stmt.query_map(params![], |row| row.get(0))?;
+
+        word_iter
+            .collect::<Result<Vec<String>, _>>()
+            .map(|vec| vec[0].clone())
+    }
+
     pub fn delete_words(&self) -> Result<(), rusqlite::Error> {
         let mut stmt = self.conn.prepare("DROP TABLE words;")?;
 
@@ -185,8 +199,17 @@ impl DB {
                 id INTEGER PRIMARY KEY autoincrement,
                 total_probability REAL,
                 word VARCHAR(5)
+
             )",
         )?;
+
+        stmt.execute(params![])?;
+        Ok(())
+    }
+    pub fn create_word_idx(&self) -> Result<(), rusqlite::Error> {
+        let mut stmt = self
+            .conn
+            .prepare("CREATE INDEX IF NOT EXISTS word_idx ON words (word)")?;
 
         stmt.execute(params![])?;
         Ok(())
@@ -201,16 +224,30 @@ impl DB {
                 word              TEXT NOT NULL,
                 number_of_guesses INTEGER NOT NULL,
                 win               BOOLEAN NOT NULL
-            ",
+            )",
         )?;
 
         stmt.execute(params![])?;
+        Ok(())
+    }
+    pub fn create_session_idx(&self) -> Result<(), rusqlite::Error> {
+        let mut stmt = self.conn.prepare(
+            "CREATE INDEX IF NOT EXISTS session_guess_idx ON session_results (number_of_guesses)",
+        )?;
+        let mut stmt2 = self.conn.prepare(
+            "CREATE INDEX IF NOT EXISTS session_type_idx ON session_results (session_type)",
+        )?;
+
+        stmt.execute(params![])?;
+        stmt2.execute(params![])?;
+
         Ok(())
     }
     pub fn new_in_memory() -> Result<Self, rusqlite::Error> {
         let conn = Connection::open_in_memory()?;
         let db = Self { conn };
         db.create_words_table()?;
+        db.create_word_idx()?;
         Ok(db)
     }
 }

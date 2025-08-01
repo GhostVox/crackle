@@ -1,5 +1,4 @@
 pub mod database;
-pub mod game_loop;
 pub mod setup;
 pub mod word_analyzer;
 pub use database::DB;
@@ -12,3 +11,4 @@ pub mod input;
 pub mod logs;
 pub mod output;
 pub mod session;
+pub mod shared_state;

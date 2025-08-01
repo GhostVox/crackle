@@ -3,8 +3,6 @@ use crate::filter_logic;
 use crate::word_analyzer::WordAnalyzer;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::mem::Discriminant;
-use std::path::Display;
 // the game engine, manages game state and logic for the game
 #[derive(Debug)]
 pub struct GameEngine {

@@ -9,6 +9,7 @@ pub struct Config {
     pub starting_word_limit: u8,
     pub app_db: PathBuf,
     pub max_guesses: u8,
+    pub test_runs: u8,
 }
 
 impl Default for Config {
@@ -21,6 +22,7 @@ impl Default for Config {
                 .join("crackle")
                 .join("crackle.db"),
             max_guesses: 6,
+            test_runs: 10,
         }
     }
 }
@@ -35,6 +37,7 @@ impl Config {
                 .join("crackle")
                 .join("crackle.db"),
             max_guesses: 6,
+            test_runs: 10,
         }
     }
 

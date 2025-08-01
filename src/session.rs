@@ -10,7 +10,7 @@ use std::fmt::Display;
 
 use rand::Rng;
 use uuid::Uuid;
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum SessionType {
     Interactive,
     Test,
@@ -120,30 +120,33 @@ impl<'c, 'a, I: InputSource, O: OutputSink> Session<'c, 'a, I, O> {
     pub fn start_interactive(&mut self) -> Result<(), FatalError> {
         // welcome the user
         welcome();
-
-        // output the starting guess
         self.output_sink
             .output_guess(self.game_engine.get_current_guess())?;
+        self.run_game_loop()
+    }
 
+    pub fn start_test_session(&mut self) -> Result<(), FatalError> {
+        self.output_sink
+            .output_guess(self.game_engine.get_current_guess())?;
+        self.run_game_loop()
+    }
+
+    pub fn run_game_loop(&mut self) -> Result<(), FatalError> {
         loop {
             // Get user feedback on the last guess
-            let user_input = match self.input_source.get_feedback() {
-                Ok(input) => input,
-                Err(e) => return Err(FatalError::IOError(e)),
-            };
+            let user_input = self.input_source.get_feedback()?;
             self.number_of_guesses += 1;
-            // parse the user input
+
+            // process feedback and check game state
             self.game_engine.parse_input(&user_input);
-            // check if the game is won
-            if self.game_engine.check_for_win() {
+            if self.game_engine.check_for_win() || self.out_of_guesses() {
+                if self.out_of_guesses() && self.session_type == SessionType::Interactive {
+                    println!("Out of guesses!");
+                }
                 return self.store_session_results();
             }
-            // check if the game is lost
-            let out_of_guesses = self.out_of_guesses();
-            if out_of_guesses {
-                println!("Out of guesses!");
-                return self.store_session_results();
-            }
+
+            // Determine the next guess
             let pattern = self.game_engine.get_pattern();
             let possible_words = self.in_memory_db.filter_words(&pattern)?;
 
@@ -158,11 +161,11 @@ impl<'c, 'a, I: InputSource, O: OutputSink> Session<'c, 'a, I, O> {
                 }
             };
 
+            // Output the next guess
             self.words_guessed.push(next_guess.clone());
             self.output_sink.output_guess(&next_guess)?;
         }
     }
-
     pub fn store_session_results(&self) -> Result<(), FatalError> {
         let session_results = self.get_session_results();
         // Store game_results in database or file

@@ -3,7 +3,7 @@ name = "crackle"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
-authors = ["Brent Harrington  <brentdev@icloud.com>"]
+authors = ["Brent Harrington  <Ghostvox@icloud.com>"]
 description = "A probabilistic Wordle solver using database-driven word filtering"
 
 [dependencies]
